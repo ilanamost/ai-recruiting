@@ -41,7 +41,8 @@ Thumbs.db
 .claude/
 .cursor/
 .doc/
-.github/
+.github/*
+!.github/workflows/
 .orchestration/
 .rule/
 AGENTS.md
