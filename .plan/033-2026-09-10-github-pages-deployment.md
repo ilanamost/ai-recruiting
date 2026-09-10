@@ -1,4 +1,5 @@
-Status: proposed
+Status: in progress — Steps 1-3 committed on `deploy/github-pages`; Steps 4-7 (manual
+GitHub Settings, push to master) still need Ilana
 Owner: Ilana
 Last updated: 2026-09-10
 
