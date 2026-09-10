@@ -1,0 +1,3 @@
+/* tokens are not imported here — they load from main.css (the Tailwind entry) so the
+   `@theme` block reaches @tailwindcss/vite. See the comment in main.css. */
+@import './reset.scss';

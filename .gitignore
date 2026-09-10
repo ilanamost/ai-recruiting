@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Env / secrets (patterns match in any directory, incl. backend/)
+.env
+.env.*
+!.env.example
+!.env.staging.example
+!.env.production.example
+
+# Build output
+dist/
+build/
+frontend/dist/
+backend/build/
+*.tsbuildinfo
+
+# Test / tooling artifacts
+coverage/
+playwright-report/
+test-results/
+.vitest/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+
+# Agent run artifacts (generated during orchestration)
+.orchestration/*-report.md
+.orchestration/FINAL-REPORT.md
+.orchestration/qa-report.md
+
+# Agent tooling, docs, and orchestrator scripts (untracked from repo)
+.claude/
+.cursor/
+.doc/
+.github/
+.orchestration/
+.rule/
+AGENTS.md
+CLAUDE.md
+dev-loop.js
+dev-loop.prompt.md
+trace-agent.js
+api-contract.yaml

@@ -1,0 +1,10 @@
+/* Single entry point for the hand-written SCSS tree (.plan/027).
+   Imported from main.ts rather than from main.css: main.css opens with `@import "tailwindcss"`,
+   which hands @import resolution for that file to @tailwindcss/vite — it inlines an imported
+   .scss target's raw bytes before Sass ever runs, silently dropping mixins/variables. Entering
+   Vite as its own .scss module (outside the Tailwind entry) is what guarantees Sass compiles
+   it. Loads after main.css so the cascade order (tailwind -> vue-sonner -> setup -> basics ->
+   cmps) is unchanged. */
+@import './setup/index.scss';
+@import './basics/index.scss';
+@import './cmps/index.scss';

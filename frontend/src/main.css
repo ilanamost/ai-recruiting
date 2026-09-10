@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@import "vue-sonner/style.css";
+
+/* Tokens live in the Tailwind entry, not the SCSS tree (.plan/027): this file carries the
+   `@theme` block that @tailwindcss/vite must read to generate the token-backed utilities
+   (.text-primary, .bg-bg, --radius-md, --font-sans). @tailwindcss/vite takes over @import
+   resolution for this file (it opens with `@import "tailwindcss"`) and inlines this target's
+   raw bytes before Sass would ever see it; routing tokens through Sass instead would hide
+   @theme from Tailwind. */
+@import "./styles/setup/tokens.css";

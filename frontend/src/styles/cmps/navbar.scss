@@ -1,0 +1,167 @@
+/* .plan/027: the round icon-button shape shared by .theme-toggle and .navbar-hamburger.
+   Every declaration except `display` is common to both, so each consumer sets its own —
+   the hamburger stays hidden until the mobile breakpoint at the bottom of this file
+   turns it on. Compiles to the same declarations the two blocks spelled out separately. */
+@mixin icon-button {
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-full, 9999px);
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  transition: color 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    color: var(--fg);
+    border-color: var(--border-strong);
+  }
+}
+
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1.5rem;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+/* A link again as of .plan/017 — /' is the home page now. It keeps the plain --fg wordmark
+   rather than borrowing .navbar-link's pill: the brand is not one of the nav destinations.
+   Without an .is-active rule of its own the class the template binds would render nothing,
+   so the active state is a colour shift only, matching .navbar-link's active colour. */
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--fg);
+  transition: color 0.15s ease;
+
+  &:hover,
+  &.is-active {
+    color: var(--primary);
+  }
+}
+
+/* .plan/019: same button shape as .theme-toggle, but hidden by default — only the mobile
+   breakpoint below turns it on. */
+.navbar-hamburger {
+  display: none;
+  @include icon-button;
+}
+
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.navbar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--fg-muted);
+  transition: background-color 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    color: var(--fg);
+    background: var(--bg);
+  }
+
+  &.is-active {
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+  }
+
+  &.is-disabled {
+    pointer-events: none;
+    opacity: 0.4;
+  }
+}
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  @include icon-button;
+}
+
+.navbar-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 10rem;
+  padding: 0.375rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-card-md);
+}
+
+.navbar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--fg-muted);
+  text-align: left;
+
+  &:hover {
+    color: var(--fg);
+    background: var(--bg);
+  }
+}
+
+/* .plan/019 — mobile nav, below Tailwind's md boundary (768px). Written as plain CSS rather
+   than `hidden md:flex` utilities: this file is unlayered, so its existing .navbar-links
+   `display: flex` would always beat a Tailwind layered utility regardless of specificity. */
+@media (max-width: 767px) {
+  .navbar-hamburger {
+    display: inline-flex;
+  }
+
+  .navbar-brand-text {
+    display: none;
+  }
+
+  .navbar-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.75rem 1.5rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-card-md);
+  }
+
+  .navbar-links.is-open {
+    display: flex;
+  }
+}

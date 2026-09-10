@@ -1,0 +1,12 @@
+/* vue-sonner only ships corner/edge-center positions ([data-y-position] is
+   top|bottom only). The "center" toaster overrides that to sit at true
+   viewport center for high-emphasis messages (e.g. "job created"). Matches
+   the library's own [data-sonner-toaster][data-y-position] specificity so it
+   reliably wins regardless of import order. */
+[data-sonner-toaster].toaster-center {
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+}

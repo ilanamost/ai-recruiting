@@ -1,0 +1,47 @@
+// Wrapped in Tailwind's `base` layer (declared by `@import "tailwindcss"` in main.css, loaded
+// before this SCSS tree per .claude/rules/ui-and-styling.md) so these element-selector resets
+// stay below `@layer utilities` in the cascade. Unlayered CSS always beats layered CSS
+// regardless of specificity — plain `button { background: none }` here previously overrode any
+// component's `bg-*`/`border-*` Tailwind utility on a `<button>` (e.g. FilterTabs.vue's selected
+// tab), because Tailwind's own utilities are generated inside `@layer utilities`. Every other
+// button-shaped element in the app uses hand-authored `.btn`/`.btn-primary` SCSS classes
+// (frontend/src/styles/cmps/), which are unlayered too and so never collided with this.
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html[data-theme='dark'] {
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+  }
+
+  button,
+  input,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    cursor: pointer;
+    background: none;
+    border: none;
+  }
+
+  ul,
+  ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+}
