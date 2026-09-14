@@ -93,7 +93,8 @@ writing or executing this plan.
 1. `backend/.env.production.example`: add the missing `ANALYSIS_MODEL=claude-sonnet-5`
    line for parity with `.env.example`, so the production checklist is complete. Decide
    here whether to also add a committed `render.yaml` Blueprint for the web service only
-   (env: node; build command `npm ci && npm run build`; start command `npm run start`;
+   (env: node; build command `npm ci --include=dev && npm run build` — see Risks for
+   why plain `npm ci` fails here; start command `npm run start`;
    health check path `/api/health`; no `databases:` entry, since Neon isn't provisioned
    through Render; secrets — `DATABASE_URL` now included, since it carries Neon
    credentials, plus `ANTHROPIC_API_KEY`/`JWT_SECRET` — marked `sync: false` so Render
@@ -110,7 +111,11 @@ writing or executing this plan.
 4. Create a Render account and connect the `ilanamost/ai-recruiting` GitHub repo.
 5. Provision the web service: **New → Web Service**, connect the repo, set:
    - Root directory: `backend`
-   - Build command: `npm ci && npm run build`
+   - Build command: `npm ci --include=dev && npm run build` — the `--include=dev` is
+     required (see Risks): with `NODE_ENV=production` set as an env var, npm's
+     default `omit=dev` behavior skips `devDependencies` during the build step,
+     which breaks `tsc` since `typescript`, `@types/node`, `@types/pg`,
+     `@types/multer`, etc. all live there.
    - Start command: `npm run start`
    - Health check path: `/api/health`
    - If `render.yaml` was committed in Step 1, use **New → Blueprint** instead and
@@ -150,6 +155,16 @@ writing or executing this plan.
   placeholder.
 
 ## Risks
+- Hit in practice: setting `NODE_ENV=production` as a Render env var (required for
+  the app's own cookie `sameSite`/`secure` logic) also makes npm's build-step
+  `npm ci`/`npm install` default to `omit=dev`, skipping `devDependencies`. Since
+  `typescript` and every `@types/*` package the build needs (`@types/node`,
+  `@types/pg`, `@types/multer`, etc.) live in `devDependencies`, the `tsc` build
+  failed outright (`Cannot find module 'pg'`, `Cannot find name 'Buffer'`, implicit
+  `any` on every Express handler param). Fixed by changing the Build Command to
+  `npm ci --include=dev && npm run build` — devDependencies are still absent from
+  the final runtime image's relevance (nothing at runtime imports them), only the
+  build step needs them present.
 - Splitting providers means every database query now crosses the public internet
   between Render's region and Neon's region, instead of staying inside one host's
   network. Likely negligible at this app's scale, but worth picking Render and Neon
