@@ -7,7 +7,7 @@ import { createAuthRouter } from './routes/auth'
 import { createJobRouter } from './routes/job'
 import { createResumeRouter } from './routes/resume'
 import { createMatchRouter } from './routes/match'
-import { AppError } from './lib/errors'
+import { AppError, ErrorCodes } from './lib/errors'
 
 export function createApp(store: Store) {
   const app = express()
@@ -42,7 +42,7 @@ export function createApp(store: Store) {
 
     if (isMulterError(err)) {
       res.status(400).json({
-        error: { code: 'validation_error', message: 'Uploaded file is invalid or too large' },
+        error: { code: ErrorCodes.VALIDATION_ERROR, message: 'Uploaded file is invalid or too large' },
         requestId
       })
       return
@@ -58,7 +58,7 @@ export function createApp(store: Store) {
 
     console.error(`[${requestId}] unexpected error`, err)
     res.status(500).json({
-      error: { code: 'internal_error', message: 'Something went wrong' },
+      error: { code: ErrorCodes.INTERNAL_ERROR, message: 'Something went wrong' },
       requestId
     })
   })
