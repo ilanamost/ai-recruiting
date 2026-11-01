@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import { ChevronDown, Download, FileText, Loader, Star, Unlink, X } from '@lucide/vue'
+import { ChevronDown, Download, FileText, Star, Unlink, X } from '@lucide/vue'
 import { EXPERIENCE_LEVELS, skillLabel, yearsToLevel } from '../lib/experience'
 // getResumeFileUrl is a pure URL builder, not a request, so it stays a direct lib/api import —
 // every actual call goes through the stores below (.plan/018).
 import { getResumeFileUrl, UNPAGED_LIMIT } from '../lib/api'
 import { apiFetch } from '../lib/http'
+import { trackPageLoad } from '../lib/loading'
 import { cardEnterDelay } from '../lib/animation'
 import { useAuth } from '../lib/auth'
 import { TOAST } from '../lib/toastMessages'
@@ -245,14 +246,16 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const [jobResumes] = await Promise.all([
-      jobStore.listJobResumes(props.job.id),
-      // The attach dropdown offers every CV not already on this job, so it needs the whole
-      // list, not one page of it (.plan/028) — hence UNPAGED_LIMIT, the server's own `limit`
-      // cap, rather than a locally-chosen large number.
-      resumeStore.listResumes(1, UNPAGED_LIMIT, { silent: true }),
-      loadLatestMatches()
-    ])
+    const [jobResumes] = await trackPageLoad(() =>
+      Promise.all([
+        jobStore.listJobResumes(props.job.id),
+        // The attach dropdown offers every CV not already on this job, so it needs the whole
+        // list, not one page of it (.plan/028) — hence UNPAGED_LIMIT, the server's own `limit`
+        // cap, rather than a locally-chosen large number.
+        resumeStore.listResumes(1, UNPAGED_LIMIT, { silent: true }),
+        loadLatestMatches()
+      ])
+    )
     attachedResumes.value = jobResumes
     if (previewResume.value && !jobResumes.some((resume) => resume.id === previewResume.value?.id)) {
       closePreview()
@@ -321,7 +324,8 @@ async function loadPreviewExtras(resume: JobResume) {
         }
       })
 
-  await Promise.all([fileCheck, matchLookup])
+  // The preview's file check and match lookup are its page-level content (.plan/035).
+  await trackPageLoad(() => Promise.all([fileCheck, matchLookup]))
 }
 
 function selectPreview(resume: JobResume) {
@@ -393,10 +397,9 @@ async function confirmDetach(resume: JobResume) {
         </button>
       </div>
 
-      <div v-if="loading" class="flex items-center gap-2 text-fg-muted">
-        <Loader class="size-4 animate-spin" />
-        <span>Loading CVs…</span>
-      </div>
+      <template v-if="loading">
+        <!-- Empty on purpose (.plan/035): AppLoader shows the centered page spinner. -->
+      </template>
 
       <div v-else-if="error" class="flex items-center gap-2 text-danger">
         <span>{{ error }}</span>
@@ -592,10 +595,9 @@ async function confirmDetach(resume: JobResume) {
       <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
         <!-- One branch only: CVs are PDF-only (.plan/030). A legacy non-PDF CV never reaches the
              iframe — loadPreviewExtras resolves it straight to 'error'. -->
-        <div v-if="previewFileStatus === 'checking'" class="flex items-center gap-2 text-fg-muted">
-          <Loader class="size-4 animate-spin" />
-          <span>Checking file…</span>
-        </div>
+        <template v-if="previewFileStatus === 'checking'">
+          <!-- Empty on purpose (.plan/035): AppLoader shows the centered page spinner. -->
+        </template>
         <div v-else-if="previewFileStatus === 'error'" class="flex items-center gap-2 text-danger">
           <span>This CV's file couldn't be loaded — replace it from the CVs page.</span>
         </div>
@@ -608,10 +610,9 @@ async function confirmDetach(resume: JobResume) {
         </div>
 
         <template v-if="canViewMatch(previewResume)">
-          <div v-if="previewMatchLoading" class="flex items-center gap-2 text-fg-muted">
-            <Loader class="size-4 animate-spin" />
-            <span>Checking for an existing match…</span>
-          </div>
+          <template v-if="previewMatchLoading">
+            <!-- Empty on purpose (.plan/035): AppLoader shows the centered page spinner. -->
+          </template>
           <MatchResult
             v-else
             :match-id="previewMatchId"

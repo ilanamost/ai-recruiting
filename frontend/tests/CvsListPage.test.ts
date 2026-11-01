@@ -35,6 +35,7 @@ vi.mock('../src/lib/auth', () => ({
 import CvsListPage from '../src/pages/CvsListPage.vue'
 import { deleteResume, listResumes, replaceResumeFile, updateResume, uploadResume } from '../src/lib/api'
 import { toast } from 'vue-sonner'
+import { useLoading } from '../src/lib/loading'
 
 // .plan/018: the page reads the resume store instead of calling lib/api itself. Each mount gets
 // its own testing Pinia with `stubActions: false`, so the real store actions run against the
@@ -644,6 +645,40 @@ describe('CvsListPage', () => {
         expect(row.findAll('button').some((btn) => btn.text().includes('Edit'))).toBe(true)
         expect(row.findAll('button').some((btn) => btn.text().includes('Delete'))).toBe(true)
       }
+    })
+  })
+
+  // .plan/035: the inline "Loading CVs…" row is gone. The page registers its list fetch as a
+  // page-level load and the shared AppLoader (mounted in App.vue) shows the centered spinner.
+  describe('global page loader', () => {
+    it('registers the CV list fetch as a page-level load until it settles, with no inline spinner row', async () => {
+      let resolveList!: (value: Awaited<ReturnType<typeof listResumes>>) => void
+      vi.mocked(listResumes).mockReturnValue(new Promise((resolve) => {
+        resolveList = resolve
+      }))
+      const { pagePendingCount } = useLoading()
+      const wrapper = mountPage()
+
+      expect(pagePendingCount.value).toBe(1)
+      expect(wrapper.text()).not.toContain('Loading CVs')
+      expect(wrapper.find('.animate-spin').exists()).toBe(false)
+
+      resolveList(pageOf(resumes))
+      await flushPromises()
+
+      expect(pagePendingCount.value).toBe(0)
+      expect(wrapper.text()).toContain('Jane Doe')
+    })
+
+    it('releases the page-level load when the CV list fails to load', async () => {
+      vi.mocked(listResumes).mockRejectedValue(new Error('Failed to load CVs'))
+      const { pagePendingCount } = useLoading()
+      mountPage()
+      expect(pagePendingCount.value).toBe(1)
+
+      await flushPromises()
+
+      expect(pagePendingCount.value).toBe(0)
     })
   })
 })

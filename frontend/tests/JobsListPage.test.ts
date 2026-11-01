@@ -37,6 +37,7 @@ vi.mock('../src/lib/auth', () => ({
 import JobsListPage from '../src/pages/JobsListPage.vue'
 import { deleteJob, duplicateJob, listJobs, listResumes, updateJob } from '../src/lib/api'
 import { toast } from 'vue-sonner'
+import { useLoading } from '../src/lib/loading'
 
 const jobs = [
   {
@@ -1068,6 +1069,39 @@ describe('JobsListPage', () => {
       await flushPromises()
 
       expect(renderedTitles(wrapper)).toEqual(['Frontend Engineer'])
+    })
+  })
+
+  // .plan/035: the inline "Loading jobs…" card is gone in favour of the shared page loader.
+  describe('global page loader', () => {
+    it('registers the jobs fetch as a page-level load until it settles, with no inline spinner card', async () => {
+      let resolveJobs!: (value: Awaited<ReturnType<typeof listJobs>>) => void
+      vi.mocked(listJobs).mockReturnValue(new Promise((resolve) => {
+        resolveJobs = resolve
+      }))
+      const { pagePendingCount } = useLoading()
+      const wrapper = mountPage()
+
+      expect(pagePendingCount.value).toBe(1)
+      expect(wrapper.text()).not.toContain('Loading jobs')
+      expect(wrapper.find('.animate-spin').exists()).toBe(false)
+
+      resolveJobs(pageOf(jobs))
+      await flushPromises()
+
+      expect(pagePendingCount.value).toBe(0)
+      expect(wrapper.text()).toContain('Backend Engineer')
+    })
+
+    it('releases the page-level load when the jobs list fails to load', async () => {
+      vi.mocked(listJobs).mockRejectedValue(new Error('Failed to load jobs'))
+      const { pagePendingCount } = useLoading()
+      mountPage()
+      expect(pagePendingCount.value).toBe(1)
+
+      await flushPromises()
+
+      expect(pagePendingCount.value).toBe(0)
     })
   })
 })

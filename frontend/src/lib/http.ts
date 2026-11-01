@@ -2,6 +2,10 @@
 // see .plan/008-2026-08-03-authentication-authorization.md). Every request goes out with
 // credentials: 'include'; a 401 triggers exactly one silent refresh-and-retry before the
 // error propagates to the caller (the router guard handles the eventual redirect-to-login).
+// Every call is counted by lib/loading.ts (.plan/035) for the whole original → refresh → retry
+// sequence, so the global loader stays up until the caller actually has its final response.
+
+import { trackRequest } from './loading'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
@@ -40,17 +44,19 @@ async function refreshAccessToken(): Promise<boolean> {
   return refreshInFlight
 }
 
-export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  const withCredentials: RequestInit = { ...options, credentials: 'include' }
-  const response = await fetch(url, withCredentials)
-  if (response.status !== 401) {
-    return response
-  }
+export function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  return trackRequest(async () => {
+    const withCredentials: RequestInit = { ...options, credentials: 'include' }
+    const response = await fetch(url, withCredentials)
+    if (response.status !== 401) {
+      return response
+    }
 
-  const refreshed = await refreshAccessToken()
-  if (!refreshed) {
-    return response
-  }
+    const refreshed = await refreshAccessToken()
+    if (!refreshed) {
+      return response
+    }
 
-  return fetch(url, withCredentials)
+    return fetch(url, withCredentials)
+  })
 }

@@ -5,6 +5,7 @@
 
 import { computed, ref } from 'vue'
 import { apiFetch, parseErrorResponse } from './http'
+import { trackRequest } from './loading'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
@@ -46,14 +47,17 @@ const profileImageUrl = computed(() =>
 
 // The login/signup/logout/refresh endpoints manage the session itself, so they go through the
 // plain fetch (not apiFetch's 401-retry loop, which only makes sense for already-authenticated
-// requests hitting an expired access token).
+// requests hitting an expired access token). They are still wrapped in trackRequest so the
+// global loader (.plan/035) covers them like every other API call.
 async function login(email: string, password: string): Promise<AuthUser> {
-  const response = await fetch(`${API_URL}/api/auth/login`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
-  })
+  const response = await trackRequest(() =>
+    fetch(`${API_URL}/api/auth/login`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    })
+  )
   if (!response.ok) {
     return parseErrorResponse(response)
   }
@@ -62,12 +66,14 @@ async function login(email: string, password: string): Promise<AuthUser> {
 }
 
 async function signup(name: string, email: string, password: string, role: 'recruiter' | 'candidate'): Promise<AuthUser> {
-  const response = await fetch(`${API_URL}/api/auth/signup`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, email, password, role })
-  })
+  const response = await trackRequest(() =>
+    fetch(`${API_URL}/api/auth/signup`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password, role })
+    })
+  )
   if (!response.ok) {
     return parseErrorResponse(response)
   }
@@ -77,7 +83,7 @@ async function signup(name: string, email: string, password: string, role: 'recr
 
 async function logout(): Promise<void> {
   try {
-    await fetch(`${API_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' })
+    await trackRequest(() => fetch(`${API_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }))
   } catch {
     // Best-effort: the client forgets its session even if the network request itself failed —
     // the caller (NavBar) redirects to /login regardless.
