@@ -42,6 +42,7 @@ vi.mock('../src/lib/auth', () => ({
 
 import JobsListPage from '../src/pages/JobsListPage.vue'
 import { listJobs, listResumes } from '../src/lib/api'
+import { useLoading } from '../src/lib/loading'
 
 // .plan/018: the page reads the job and resume stores rather than lib/api directly, so every
 // mount installs its own testing Pinia running the real store actions against the mocked
@@ -234,7 +235,8 @@ describe('JobsListPage search/filter — adversarial (.plan/013)', () => {
     vi.mocked(listJobs).mockReturnValue(new Promise(() => {}))
     const wrapper = mountPage()
 
-    expect(wrapper.text()).toContain('Loading jobs')
+    // .plan/035: loading is shown by the shared page loader, not an inline "Loading jobs…" card.
+    expect(useLoading().isPageLoading.value).toBe(true)
     expectNoFilterRows(wrapper)
   })
 

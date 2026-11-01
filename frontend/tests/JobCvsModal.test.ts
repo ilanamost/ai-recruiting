@@ -50,6 +50,7 @@ import {
   listResumes
 } from '../src/lib/api'
 import { toast } from 'vue-sonner'
+import { useLoading } from '../src/lib/loading'
 
 const job = {
   id: 'job-1',
@@ -289,8 +290,10 @@ describe('JobCvsModal', () => {
     await flushPromises()
 
     expect(toast.error).toHaveBeenCalledWith('Job not found')
-    // The lookup spinner must not be left hanging when the lookup rejects.
-    expect(wrapper.text()).not.toContain('Checking for an existing match…')
+    // The lookup's page-level load must not be left hanging when the lookup rejects (.plan/035):
+    // the preview moves on to the match card instead of staying in its loading branch.
+    expect(useLoading().pagePendingCount.value).toBe(0)
+    expect(wrapper.text()).toContain('Match result')
   })
 
   it('renders a download link pointing at the file endpoint with download=1', async () => {
@@ -352,8 +355,8 @@ describe('JobCvsModal', () => {
     expect(wrapper.find('iframe').exists()).toBe(false)
     // No HTML-preview call, and no HEAD check either — nothing is fetched for a non-PDF CV.
     expect(fetchMock).not.toHaveBeenCalled()
-    // The status resolves synchronously, so the spinner must never be left behind.
-    expect(wrapper.text()).not.toContain('Checking file…')
+    // The status resolves synchronously, so no page-level load is left behind (.plan/035).
+    expect(useLoading().pagePendingCount.value).toBe(0)
   })
 
   it('shows an inline failure message instead of a broken iframe when the file HEAD check fails', async () => {
@@ -1010,7 +1013,7 @@ describe('JobCvsModal', () => {
       ])
       // The modal's own error surface belongs to the CV list; a rating lookup failure must not claim it.
       expect(wrapper.text()).not.toContain('Failed to load CVs for this job')
-      expect(wrapper.text()).not.toContain('Loading CVs…')
+      expect(useLoading().pagePendingCount.value).toBe(0)
     })
   })
 
@@ -1288,5 +1291,64 @@ describe('JobCvsModal', () => {
 
     const downloadLink = wrapper.findAll('a').find((a) => a.text().includes('Download'))
     expect(downloadLink?.attributes('href')).toBe('http://localhost:3001/api/resume/resume-1/file?download=1')
+  })
+
+  // .plan/035: the modal's inline "Loading CVs…", "Checking file…" and "Checking for an existing
+  // match…" rows are gone; each of those waits is a page-level load the shared AppLoader shows.
+  describe('global page loader', () => {
+    it('registers the attached-CV fetch as a page-level load until it settles, with no inline spinner row', async () => {
+      let resolveAttached!: (value: Awaited<ReturnType<typeof listJobResumes>>) => void
+      vi.mocked(listJobResumes).mockReturnValue(new Promise((resolve) => {
+        resolveAttached = resolve
+      }))
+      const { pagePendingCount } = useLoading()
+      const wrapper = mountModal()
+
+      expect(pagePendingCount.value).toBe(1)
+      expect(wrapper.text()).not.toContain('Loading CVs')
+      expect(wrapper.find('.animate-spin').exists()).toBe(false)
+
+      resolveAttached([attachedPdf, attachedSecondPdf])
+      await flushPromises()
+
+      expect(pagePendingCount.value).toBe(0)
+      expect(wrapper.text()).toContain('Jane Doe')
+    })
+
+    it('registers the preview file check and match lookup as one page-level load', async () => {
+      let resolveHead!: (value: unknown) => void
+      fetchMock.mockReturnValue(new Promise((resolve) => {
+        resolveHead = resolve
+      }))
+      const { pagePendingCount } = useLoading()
+      const wrapper = mountModal()
+      await flushPromises()
+      expect(pagePendingCount.value).toBe(0)
+
+      const row = wrapper.findAll('li').find((li) => li.text().includes('Jane Doe'))
+      await row?.trigger('click')
+
+      expect(pagePendingCount.value).toBe(1)
+      expect(wrapper.text()).not.toContain('Checking file')
+      expect(wrapper.find('iframe').exists()).toBe(false)
+
+      resolveHead({ ok: true, status: 200 })
+      await flushPromises()
+
+      expect(pagePendingCount.value).toBe(0)
+      expect(wrapper.find('iframe').exists()).toBe(true)
+    })
+
+    it('releases the page-level load when the attached-CV fetch fails', async () => {
+      vi.mocked(listJobResumes).mockRejectedValue(new Error('Failed to load CVs for this job'))
+      const { pagePendingCount } = useLoading()
+      const wrapper = mountModal()
+      expect(pagePendingCount.value).toBe(1)
+
+      await flushPromises()
+
+      expect(pagePendingCount.value).toBe(0)
+      expect(wrapper.text()).toContain('Failed to load CVs for this job')
+    })
   })
 })

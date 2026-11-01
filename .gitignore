@@ -49,3 +49,4 @@ dev-loop.js
 dev-loop.prompt.md
 trace-agent.js
 api-contract.yaml
+.plan/000-backlog.md

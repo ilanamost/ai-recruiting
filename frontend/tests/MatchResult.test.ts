@@ -16,6 +16,7 @@ vi.mock('vue-sonner', () => ({
 import MatchResult from '../src/components/MatchResult.vue'
 import { createMatch } from '../src/lib/api'
 import { toast } from 'vue-sonner'
+import { useLoading } from '../src/lib/loading'
 
 // .plan/018: the component calls the match store, which is the only thing that calls lib/api.
 // `stubActions: false` runs the real store action against the mocked lib/api.
@@ -117,5 +118,46 @@ describe('MatchResult', () => {
     // .plan/018 deliberately left createMatch/getMatch as the two non-toasting match actions:
     // this failure is reported inside the card, so a toast would double-report it.
     expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  // .plan/035: the inline "Scoring the match…" row is gone; scoring is a page-level load.
+  describe('global page loader', () => {
+    it('registers scoring as a page-level load until the score arrives, with no inline spinner row', async () => {
+      let resolveMatch!: (value: Awaited<ReturnType<typeof createMatch>>) => void
+      vi.mocked(createMatch).mockReturnValue(new Promise((resolve) => {
+        resolveMatch = resolve
+      }))
+      const { pagePendingCount } = useLoading()
+      const wrapper = mountMatchResult({ resumeId: 'resume-1', jobId: 'job-1' })
+
+      expect(pagePendingCount.value).toBe(1)
+      expect(wrapper.text()).not.toContain('Scoring the match')
+      expect(wrapper.find('.animate-spin').exists()).toBe(false)
+
+      resolveMatch({
+        id: 'match-1',
+        resume_id: 'resume-1',
+        job_id: 'job-1',
+        score: 64,
+        explanation: 'Partial overlap.',
+        created_at: new Date().toISOString()
+      })
+      await flushPromises()
+
+      expect(pagePendingCount.value).toBe(0)
+      expect(wrapper.text()).toContain('64')
+    })
+
+    it('releases the page-level load when scoring fails', async () => {
+      vi.mocked(createMatch).mockRejectedValue(new Error('Scoring failed'))
+      const { pagePendingCount } = useLoading()
+      const wrapper = mountMatchResult({ resumeId: 'resume-1', jobId: 'job-1' })
+      expect(pagePendingCount.value).toBe(1)
+
+      await flushPromises()
+
+      expect(pagePendingCount.value).toBe(0)
+      expect(wrapper.text()).toContain('Scoring failed')
+    })
   })
 })

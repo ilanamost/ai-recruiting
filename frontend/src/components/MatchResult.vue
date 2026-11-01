@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { CircleCheck, CircleX, Loader } from '@lucide/vue'
+import { CircleCheck, CircleX } from '@lucide/vue'
+import { trackPageLoad } from '../lib/loading'
 import { useMatchStore } from '../stores/match'
 import type { Match } from '../types'
 
@@ -34,9 +35,12 @@ async function run() {
   error.value = null
   match.value = null
   try {
-    const resolved = props.matchId
-      ? await matchStore.getMatch(props.matchId)
-      : await matchStore.createMatch({ resume_id: props.resumeId!, job_id: props.jobId! })
+    // Scoring is this card's whole content (and can take seconds), so it is a page-level load.
+    const resolved = await trackPageLoad(() =>
+      props.matchId
+        ? matchStore.getMatch(props.matchId)
+        : matchStore.createMatch({ resume_id: props.resumeId!, job_id: props.jobId! })
+    )
     match.value = resolved
     emit('resolved', resolved)
   } catch (err) {
@@ -53,10 +57,9 @@ watch(() => [props.matchId, props.resumeId, props.jobId], run, { immediate: true
   <section class="card flex flex-col gap-4">
     <h2 class="text-lg font-semibold">Match result</h2>
 
-    <div v-if="loading" class="flex items-center gap-2 text-fg-muted">
-      <Loader class="size-4 animate-spin" />
-      <span>Scoring the match…</span>
-    </div>
+    <template v-if="loading">
+      <!-- Empty on purpose (.plan/035): AppLoader shows the centered page spinner. -->
+    </template>
 
     <div v-else-if="error" class="flex items-center gap-2 text-danger">
       <CircleX class="size-4" />

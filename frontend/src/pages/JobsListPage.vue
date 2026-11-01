@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import { Briefcase, ChevronDown, Copy, Inbox, Loader, MapPin, Pencil, Search, Trash2, Users, X } from '@lucide/vue'
+import { Briefcase, ChevronDown, Copy, Inbox, MapPin, Pencil, Search, Trash2, Users, X } from '@lucide/vue'
 import { cardEnterDelay } from '../lib/animation'
 import JobCvsModal from '../components/JobCvsModal.vue'
 import Pager from '../components/Pager.vue'
 import { UNPAGED_LIMIT } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { trackPageLoad } from '../lib/loading'
 import { TOAST } from '../lib/toastMessages'
 import { useJobStore } from '../stores/job'
 import { useResumeStore } from '../stores/resume'
@@ -139,16 +140,17 @@ function localDateKey(value: string) {
   return new Date(value).toLocaleDateString('en-CA')
 }
 
-// `background` skips the blocking "Loading jobs…" card. Turning a filter on or off re-requests
-// the list at a different page size, and swapping the whole list out for a spinner on the first
-// character typed would be a worse experience than letting the already-loaded jobs stay on
-// screen (filtered client-side) until the wider response lands.
+// `background` skips the blocking page-level loader (AppLoader's centered spinner, .plan/035).
+// Turning a filter on or off re-requests the list at a different page size, and swapping the
+// whole list out for a spinner on the first character typed would be a worse experience than
+// letting the already-loaded jobs stay on screen (filtered client-side) until the wider response
+// lands. A background re-load still shows the global top bar, since every apiFetch does.
 async function load(options?: { background?: boolean }) {
   if (!options?.background) {
     loading.value = true
   }
-  try {
-    await Promise.all([
+  const run = () =>
+    Promise.all([
       hasActiveFilter.value
         ? jobStore.listJobs(ORG_ID, 1, UNPAGED_LIMIT)
         : jobStore.listJobs(ORG_ID, page.value, pageSize.value),
@@ -157,6 +159,8 @@ async function load(options?: { background?: boolean }) {
       // paginates resumes.
       resumeStore.listResumes(1, UNPAGED_LIMIT)
     ])
+  try {
+    await (options?.background ? run() : trackPageLoad(run))
     // Follow whatever page the store actually loaded (it steps back off an emptied last page).
     page.value = jobStore.page
   } catch {
@@ -358,10 +362,9 @@ async function onCvsChanged() {
       </div>
     </template>
 
-    <div v-if="loading" class="card flex items-center gap-2 text-fg-muted">
-      <Loader class="size-4 animate-spin" />
-      <span>Loading jobs…</span>
-    </div>
+    <template v-if="loading">
+      <!-- Empty on purpose (.plan/035): AppLoader shows the centered page spinner. -->
+    </template>
 
     <!-- fade-in on the empty/error cards (.plan/014 item 5): the same plain fade the loaded
          cards use, so these don't pop in instantly while everything else animates. No

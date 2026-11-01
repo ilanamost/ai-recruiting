@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { Briefcase, ChevronDown, FileText, Inbox, Loader, Pencil, RefreshCw, Trash2, Upload } from '@lucide/vue'
+import { Briefcase, ChevronDown, FileText, Inbox, Pencil, RefreshCw, Trash2, Upload } from '@lucide/vue'
 import { cardEnterDelay } from '../lib/animation'
 import Pager from '../components/Pager.vue'
 import { useAuth } from '../lib/auth'
+import { trackPageLoad } from '../lib/loading'
 import { TOAST } from '../lib/toastMessages'
 import { useResumeStore } from '../stores/resume'
 import type { Resume } from '../types'
@@ -87,7 +88,7 @@ function formatDate(value: string) {
 async function load() {
   loading.value = true
   try {
-    await resumeStore.listResumes(page.value, pageSize.value)
+    await trackPageLoad(() => resumeStore.listResumes(page.value, pageSize.value))
     // The store may have stepped back a page (an empty page after a delete), so follow it
     // rather than leaving the Pager pointing at a page nothing was loaded for.
     page.value = resumeStore.page
@@ -278,10 +279,9 @@ async function submitUpload() {
 
       <input ref="replaceFileInput" type="file" accept=".pdf" class="hidden" @change="onReplaceFileChange" />
 
-      <div v-if="loading" class="card flex items-center gap-2 text-fg-muted">
-        <Loader class="size-4 animate-spin" />
-        <span>Loading CVs…</span>
-      </div>
+      <template v-if="loading">
+        <!-- Empty on purpose (.plan/035): AppLoader shows the centered page spinner. -->
+      </template>
 
       <!-- fade-in on the empty/error cards (.plan/014 item 5): the same plain fade the loaded
            cards use, so these don't pop in instantly while everything else animates. No
