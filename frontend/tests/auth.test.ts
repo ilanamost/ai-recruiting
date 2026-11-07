@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../src/lib/http'
 import { type AuthUser, useAuth } from '../src/lib/auth'
+import { getAccessToken, getRefreshToken, setTokens } from '../src/lib/token'
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return {
@@ -25,6 +26,7 @@ describe('lib/auth — useAuth', () => {
   beforeEach(() => {
     fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
+    localStorage.clear()
     // Reset the module-level singleton state between tests.
     const { user } = useAuth()
     user.value = null
@@ -187,5 +189,109 @@ describe('lib/auth — useAuth', () => {
     expect(firstUrl).not.toBeNull()
     expect(secondUrl).not.toBeNull()
     expect(secondUrl).not.toBe(firstUrl)
+  })
+})
+
+describe('lib/auth — bearer tokens (.plan/036)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+  const tokens = { access_token: 'acc-1', refresh_token: 'ref-1' }
+
+  beforeEach(() => {
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    localStorage.clear()
+    const { user } = useAuth()
+    user.value = null
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    localStorage.clear()
+  })
+
+  it('login stores the token pair and keeps it out of the user state', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ...recruiter, ...tokens }))
+    const { login, user } = useAuth()
+
+    const result = await login('rita@example.com', 'secret123')
+
+    expect(result).toEqual(recruiter)
+    expect(user.value).toEqual(recruiter)
+    expect(getAccessToken()).toBe('acc-1')
+    expect(getRefreshToken()).toBe('ref-1')
+  })
+
+  it('signup stores the token pair', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ...recruiter, ...tokens }))
+    const { signup, user } = useAuth()
+
+    await signup('Rita Recruiter', 'rita@example.com', 'secret123', 'recruiter')
+
+    expect(user.value).toEqual(recruiter)
+    expect(getAccessToken()).toBe('acc-1')
+  })
+
+  it('a failed login stores no tokens', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ error: { code: 'unauthorized', message: 'Invalid email or password' } }, { ok: false, status: 401 })
+    )
+    const { login } = useAuth()
+
+    await expect(login('rita@example.com', 'wrong')).rejects.toThrow(ApiError)
+    expect(getAccessToken()).toBeNull()
+  })
+
+  it('logout sends the bearer header and refresh token in the body, then clears the tokens', async () => {
+    setTokens(tokens)
+    fetchMock.mockResolvedValue({ ok: true, status: 204, json: async () => null } as Response)
+    const { logout } = useAuth()
+
+    await logout()
+
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer acc-1' },
+      body: JSON.stringify({ refresh_token: 'ref-1' })
+    })
+    expect(getAccessToken()).toBeNull()
+    expect(getRefreshToken()).toBeNull()
+  })
+
+  it('logout clears the tokens even when the request fails', async () => {
+    setTokens(tokens)
+    fetchMock.mockRejectedValue(new Error('network down'))
+    const { logout } = useAuth()
+
+    await logout()
+
+    expect(getAccessToken()).toBeNull()
+    expect(getRefreshToken()).toBeNull()
+  })
+
+  it('fetchMe sends the stored access token as a bearer header', async () => {
+    setTokens(tokens)
+    fetchMock.mockResolvedValue(jsonResponse(recruiter))
+    const { fetchMe, user } = useAuth()
+
+    await fetchMe()
+
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/api/auth/me', {
+      credentials: 'include',
+      headers: { Authorization: 'Bearer acc-1' }
+    })
+    expect(user.value).toEqual(recruiter)
+  })
+
+  it('updateProfile stores a rotated pair (password/role change) and strips it from the user', async () => {
+    setTokens(tokens)
+    fetchMock.mockResolvedValue(jsonResponse({ ...recruiter, access_token: 'acc-2', refresh_token: 'ref-2' }))
+    const { updateProfile, user } = useAuth()
+
+    await updateProfile({ new_password: 'newpass123', current_password: 'oldpass123' })
+
+    expect(user.value).toEqual(recruiter)
+    expect(getAccessToken()).toBe('acc-2')
+    expect(getRefreshToken()).toBe('ref-2')
   })
 })

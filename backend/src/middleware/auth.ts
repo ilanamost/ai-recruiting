@@ -12,16 +12,27 @@ declare global {
   }
 }
 
+/** Returns the token from an `Authorization: Bearer <token>` header, or undefined. */
+export function readBearerToken(req: Request): string | undefined {
+  const header = req.headers.authorization
+  if (typeof header !== 'string') return undefined
+  const match = /^Bearer\s+(\S+)\s*$/i.exec(header)
+  return match ? match[1] : undefined
+}
+
 /**
- * Verifies the access_token cookie and attaches req.user. Throws a 401
- * AuthenticationError if the cookie is missing/invalid/expired — per the
+ * Verifies the access token and attaches req.user. The token comes from the
+ * access_token cookie or, as a fallback for browsers that drop cross-site
+ * cookies (iOS Safari — .plan/036), from `Authorization: Bearer <jwt>`. Same
+ * JWT, same TTL, same claims either way; a valid cookie wins over the header.
+ * Throws a 401 AuthenticationError if neither carries a valid token — per the
  * plan, this never touches the store: the JWT payload itself carries
  * id/role/orgId, so every authenticated request is a single verify, not a
  * DB round trip.
  */
 export function requireAuth(req: Request, _res: Response, next: NextFunction): void {
-  const token = req.cookies?.[accessTokenCookieName()] as string | undefined
-  const payload = verifyAccessToken(token)
+  const cookieToken = req.cookies?.[accessTokenCookieName()] as string | undefined
+  const payload = verifyAccessToken(cookieToken) ?? verifyAccessToken(readBearerToken(req))
 
   if (!payload) {
     next(new AuthenticationError())

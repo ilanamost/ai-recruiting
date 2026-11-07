@@ -1,11 +1,13 @@
 // Reactive auth composable — mirrors lib/theme.ts's module-level reactive-state style so every
 // caller (router guard, NavBar, LoginPage, SettingsPage) shares one source of truth for the
-// signed-in user. Auth is cookie-based (httpOnly access_token/refresh_token, see
-// .plan/008-2026-08-03-authentication-authorization.md) — there is no bearer token to store here.
+// signed-in user. Auth is httpOnly cookies (.plan/008) plus, since .plan/036, a bearer-token
+// fallback for browsers that drop cross-site cookies (iOS Safari): login/signup/refresh bodies
+// also carry `access_token`/`refresh_token`, which lib/token.ts keeps in localStorage.
 
 import { computed, ref } from 'vue'
 import { apiFetch, parseErrorResponse } from './http'
 import { trackRequest } from './loading'
+import { clearTokens, getRefreshToken, takeTokens, withAuthHeader } from './token'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
@@ -61,8 +63,8 @@ async function login(email: string, password: string): Promise<AuthUser> {
   if (!response.ok) {
     return parseErrorResponse(response)
   }
-  user.value = await response.json()
-  return user.value as AuthUser
+  user.value = takeTokens(await response.json()) as AuthUser
+  return user.value
 }
 
 async function signup(name: string, email: string, password: string, role: 'recruiter' | 'candidate'): Promise<AuthUser> {
@@ -77,18 +79,34 @@ async function signup(name: string, email: string, password: string, role: 'recr
   if (!response.ok) {
     return parseErrorResponse(response)
   }
-  user.value = await response.json()
-  return user.value as AuthUser
+  user.value = takeTokens(await response.json()) as AuthUser
+  return user.value
+}
+
+// Bearer clients send the access token (logout is behind requireAuth) and the refresh token in
+// the body so the server can revoke it; a cookie-only session sends neither, as before.
+function logoutRequestInit(): RequestInit {
+  const init: RequestInit = { method: 'POST', credentials: 'include' }
+  const refreshToken = getRefreshToken()
+  const headers = withAuthHeader(refreshToken ? { 'Content-Type': 'application/json' } : undefined)
+  if (headers !== undefined) {
+    init.headers = headers
+  }
+  if (refreshToken) {
+    init.body = JSON.stringify({ refresh_token: refreshToken })
+  }
+  return init
 }
 
 async function logout(): Promise<void> {
   try {
-    await trackRequest(() => fetch(`${API_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }))
+    await trackRequest(() => fetch(`${API_URL}/api/auth/logout`, logoutRequestInit()))
   } catch {
     // Best-effort: the client forgets its session even if the network request itself failed —
     // the caller (NavBar) redirects to /login regardless.
   } finally {
     user.value = null
+    clearTokens()
     // QA finding, .plan/024: without this, a different user logging in the same browser
     // session could land on a profile-image URL (same path, same counter value) already cached
     // for the previous user. Resetting on logout removes that collision window entirely.
@@ -152,9 +170,11 @@ async function updateProfile(input: UpdateProfileInput): Promise<AuthUser> {
   if (!response.ok) {
     return parseErrorResponse(response)
   }
-  user.value = await response.json()
+  // A password or role change re-issues the session and revokes every other refresh token —
+  // including the one a bearer client holds — so the rotated pair arrives in this body too.
+  user.value = takeTokens(await response.json()) as AuthUser
   profileImageVersion.value += 1
-  return user.value as AuthUser
+  return user.value
 }
 
 export function useAuth() {

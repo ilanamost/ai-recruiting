@@ -9,6 +9,16 @@
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
+  max-width: 100%;
+}
+
+/* .plan/036: a long CV file name or job location in a nowrap badge was wider than a 390px
+   iPhone row. On mobile the badge wraps (anywhere, since file names have no spaces) instead. */
+@media (max-width: 767px) {
+  .list-badge {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }
 
 .list-confirm {

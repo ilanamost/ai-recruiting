@@ -1,4 +1,4 @@
-import { Router, type Response } from 'express'
+import { Router, type Request, type Response } from 'express'
 import multer from 'multer'
 import type { AppUser, Store, UpdateUserInput } from '../store/types'
 import { AuthenticationError, NotFoundError, ValidationError } from '../lib/errors'
@@ -50,7 +50,8 @@ function toAuthUser(user: AppUser) {
  * Sets both session cookies on the response and returns the freshly-created
  * refresh_token row (callers that need to exclude "the session just
  * re-issued" from a bulk revoke — e.g. PATCH /me's password-change flow —
- * use its id).
+ * use its id) plus the raw token pair, which callers also put in the JSON
+ * body for clients whose browser drops the cookies (.plan/036).
  */
 async function issueSession(store: Store, res: Response, user: AppUser) {
   const accessToken = signAccessToken({ id: user.id, role: user.role, orgId: user.org_id })
@@ -64,7 +65,22 @@ async function issueSession(store: Store, res: Response, user: AppUser) {
   res.cookie(accessTokenCookieName(), accessToken, accessTokenCookieOptions())
   res.cookie(refreshTokenCookieName(), refreshToken, refreshTokenCookieOptions())
 
-  return refreshTokenRow
+  return {
+    refreshTokenRow,
+    tokens: { access_token: accessToken, refresh_token: refreshToken }
+  }
+}
+
+/**
+ * The refresh token from the refresh_token cookie, else from the JSON body's
+ * `refresh_token` (bearer clients whose browser drops the cookie). A non-string
+ * or empty body value counts as absent.
+ */
+function readRefreshToken(req: Request): string | undefined {
+  const fromCookie = req.cookies?.[refreshTokenCookieName()] as string | undefined
+  if (typeof fromCookie === 'string' && fromCookie !== '') return fromCookie
+  const fromBody = (req.body as { refresh_token?: unknown } | undefined)?.refresh_token
+  return typeof fromBody === 'string' && fromBody !== '' ? fromBody : undefined
 }
 
 function clearSessionCookies(res: Response) {
@@ -103,8 +119,8 @@ export function createAuthRouter(store: Store): Router {
         role
       })
 
-      await issueSession(store, res, user)
-      res.status(201).json(toAuthUser(user))
+      const { tokens } = await issueSession(store, res, user)
+      res.status(201).json({ ...toAuthUser(user), ...tokens })
     } catch (error) {
       next(error)
     }
@@ -129,8 +145,8 @@ export function createAuthRouter(store: Store): Router {
         throw invalidCredentials()
       }
 
-      await issueSession(store, res, user)
-      res.status(200).json(toAuthUser(user))
+      const { tokens } = await issueSession(store, res, user)
+      res.status(200).json({ ...toAuthUser(user), ...tokens })
     } catch (error) {
       next(error)
     }
@@ -138,7 +154,7 @@ export function createAuthRouter(store: Store): Router {
 
   router.post('/logout', requireAuth, async (req, res, next) => {
     try {
-      const refreshToken = req.cookies?.[refreshTokenCookieName()] as string | undefined
+      const refreshToken = readRefreshToken(req)
       if (refreshToken) {
         const tokenRow = await store.getRefreshTokenByHash(hashRefreshToken(refreshToken))
         if (tokenRow) {
@@ -155,7 +171,7 @@ export function createAuthRouter(store: Store): Router {
 
   router.post('/refresh', async (req, res, next) => {
     try {
-      const refreshToken = req.cookies?.[refreshTokenCookieName()] as string | undefined
+      const refreshToken = readRefreshToken(req)
       const invalid = () => {
         clearSessionCookies(res)
         return new AuthenticationError('Invalid or expired refresh token')
@@ -190,8 +206,8 @@ export function createAuthRouter(store: Store): Router {
       }
 
       await store.revokeRefreshToken(tokenRow.id)
-      await issueSession(store, res, user)
-      res.status(200).send()
+      const { tokens } = await issueSession(store, res, user)
+      res.status(200).json(tokens)
     } catch (error) {
       next(error)
     }
@@ -296,8 +312,13 @@ export function createAuthRouter(store: Store): Router {
         // making this very request alive: issue a fresh pair of cookies
         // first, then revoke every other refresh token, excluding the one
         // just issued.
-        const newSessionToken = await issueSession(store, res, updated)
-        await store.revokeAllRefreshTokensForUser(updated.id, newSessionToken.id)
+        // The new pair also goes in the body: the bulk revoke below kills the
+        // refresh token a bearer client holds, so without it that client is
+        // signed out once its access token expires (.plan/036).
+        const { refreshTokenRow, tokens } = await issueSession(store, res, updated)
+        await store.revokeAllRefreshTokensForUser(updated.id, refreshTokenRow.id)
+        res.json({ ...toAuthUser(updated), ...tokens })
+        return
       }
 
       res.json(toAuthUser(updated))

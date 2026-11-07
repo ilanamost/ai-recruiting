@@ -14,8 +14,16 @@ export function createApp(store: Store) {
 
   // credentials: true is required so the browser sends/accepts the httpOnly
   // access_token/refresh_token cookies (see .plan/008-*'s Assumptions) —
-  // every frontend request sends credentials: 'include'.
-  app.use(cors({ origin: process.env.FRONTEND_URL ?? 'http://localhost:5173', credentials: true }))
+  // every frontend request sends credentials: 'include'. `Authorization` is
+  // allowed for the bearer-token fallback used where the browser drops
+  // cross-site cookies (iOS Safari — .plan/036).
+  app.use(
+    cors({
+      origin: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+      credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization']
+    })
+  )
   app.use(express.json())
   app.use(cookieParser())
 

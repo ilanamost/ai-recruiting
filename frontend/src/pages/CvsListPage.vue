@@ -327,7 +327,7 @@ async function submitUpload() {
 
           <template v-else>
             <div class="flex items-start justify-between gap-3">
-              <div class="flex flex-col gap-1">
+              <div class="flex min-w-0 flex-col gap-1 [overflow-wrap:anywhere]">
                 <p class="font-semibold">{{ resume.candidate_name }}</p>
                 <p class="text-sm text-fg-muted">{{ resume.candidate_email }}</p>
               </div>
