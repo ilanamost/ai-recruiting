@@ -388,7 +388,7 @@ async function confirmDetach(resume: JobResume) {
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click.self="emit('close')">
     <div class="card flex max-h-[85vh] w-full max-w-4xl flex-col gap-4 overflow-hidden">
       <div class="flex items-start justify-between gap-3">
-        <div class="flex flex-col gap-1">
+        <div class="flex min-w-0 flex-col gap-1 [overflow-wrap:anywhere]">
           <h2 class="text-lg font-semibold">Manage CVs</h2>
           <p class="text-sm text-fg-muted">{{ job.title }}</p>
         </div>
@@ -516,7 +516,7 @@ async function confirmDetach(resume: JobResume) {
             @click="selectPreview(resume)"
           >
             <div class="flex items-start justify-between gap-3">
-              <div class="flex items-start gap-2">
+              <div class="flex min-w-0 items-start gap-2">
                 <!-- The rating is one labelled group, not N labelled icons: a screen reader
                      should hear "4 of 5 stars" once, not "star" four times. The icons
                      themselves are decorative inside it. -->
@@ -533,7 +533,7 @@ async function confirmDetach(resume: JobResume) {
                     aria-hidden="true"
                   />
                 </span>
-                <div class="flex flex-col gap-1">
+                <div class="flex min-w-0 flex-col gap-1 [overflow-wrap:anywhere]">
                   <p class="font-semibold">{{ resume.candidate_name }}</p>
                   <p class="text-sm text-fg-muted">{{ resume.candidate_email }}</p>
                 </div>

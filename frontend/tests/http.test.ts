@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, apiFetch, parseErrorResponse } from '../src/lib/http'
+import { getAccessToken, getRefreshToken, setTokens } from '../src/lib/token'
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return {
@@ -95,6 +96,105 @@ describe('lib/http — apiFetch', () => {
 
     const refreshCalls = fetchMock.mock.calls.filter((call) => call[0].endsWith('/api/auth/refresh'))
     expect(refreshCalls).toHaveLength(1)
+  })
+})
+
+describe('lib/http — bearer-token fallback (.plan/036)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    localStorage.clear()
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    localStorage.clear()
+  })
+
+  it('sends Authorization: Bearer <access> alongside credentials when a token is stored', async () => {
+    setTokens({ access_token: 'acc-1', refresh_token: 'ref-1' })
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }))
+
+    await apiFetch('http://localhost:3001/api/job', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/api/job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer acc-1' },
+      credentials: 'include'
+    })
+  })
+
+  it('refreshes with the refresh token in the JSON body, stores the rotated pair, and retries with the new access token', async () => {
+    setTokens({ access_token: 'acc-old', refresh_token: 'ref-old' })
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({}, { ok: false, status: 401 })) // original request
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'acc-new', refresh_token: 'ref-new' })) // refresh
+      .mockResolvedValueOnce(jsonResponse({ id: 'job-1' })) // retried request
+
+    const response = await apiFetch('http://localhost:3001/api/job/job-1')
+
+    expect(fetchMock.mock.calls[1]).toEqual([
+      'http://localhost:3001/api/auth/refresh',
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: 'ref-old' })
+      }
+    ])
+    expect(fetchMock.mock.calls[2]).toEqual([
+      'http://localhost:3001/api/job/job-1',
+      { credentials: 'include', headers: { Authorization: 'Bearer acc-new' } }
+    ])
+    expect(getAccessToken()).toBe('acc-new')
+    expect(getRefreshToken()).toBe('ref-new')
+    expect(response.status).toBe(200)
+  })
+
+  it('clears the stored tokens when the refresh is rejected', async () => {
+    setTokens({ access_token: 'acc-old', refresh_token: 'ref-old' })
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({}, { ok: false, status: 401 })) // original request
+      .mockResolvedValueOnce(jsonResponse({}, { ok: false, status: 401 })) // refresh rejected
+
+    const response = await apiFetch('http://localhost:3001/api/job/job-1')
+
+    expect(response.status).toBe(401)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(getAccessToken()).toBeNull()
+    expect(getRefreshToken()).toBeNull()
+  })
+
+  it('keeps the tokens when the refresh fails on the network (not an auth failure)', async () => {
+    setTokens({ access_token: 'acc-old', refresh_token: 'ref-old' })
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({}, { ok: false, status: 401 }))
+      .mockRejectedValueOnce(new Error('network down'))
+
+    const response = await apiFetch('http://localhost:3001/api/job/job-1')
+
+    expect(response.status).toBe(401)
+    expect(getRefreshToken()).toBe('ref-old')
+  })
+
+  it('accepts a cookie-only refresh (200 with no JSON body) without touching storage', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({}, { ok: false, status: 401 }))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => {
+          throw new Error('empty body')
+        }
+      } as unknown as Response)
+      .mockResolvedValueOnce(jsonResponse({ id: 'job-1' }))
+
+    const response = await apiFetch('http://localhost:3001/api/job/job-1')
+
+    expect(response.status).toBe(200)
+    expect(getAccessToken()).toBeNull()
   })
 })
 

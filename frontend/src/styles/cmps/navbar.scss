@@ -26,7 +26,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.875rem 1.5rem;
+  /* .plan/036: top/side padding clears the iPhone notch and rounded corners (landscape puts
+     the notch on a side). max() keeps the design padding where the insets are 0. */
+  padding-top: max(var(--navbar-pad-y), env(safe-area-inset-top));
+  padding-bottom: var(--navbar-pad-y);
+  padding-left: max(var(--navbar-pad-x), env(safe-area-inset-left));
+  padding-right: max(var(--navbar-pad-x), env(safe-area-inset-right));
   background: color-mix(in srgb, var(--surface) 85%, transparent);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
@@ -38,6 +43,7 @@
    so the active state is a colour shift only, matching .navbar-link's active colour. */
 .navbar-brand {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 0.5rem;
   font-weight: 700;
@@ -93,6 +99,7 @@
 
 .navbar-actions {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 0.5rem;
 }
@@ -155,7 +162,10 @@
     z-index: 30;
     flex-direction: column;
     align-items: stretch;
-    padding: 0.75rem 1.5rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    padding-left: max(var(--navbar-pad-x), env(safe-area-inset-left));
+    padding-right: max(var(--navbar-pad-x), env(safe-area-inset-right));
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     box-shadow: var(--shadow-card-md);

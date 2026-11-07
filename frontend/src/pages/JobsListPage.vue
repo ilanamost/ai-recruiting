@@ -514,7 +514,7 @@ async function onCvsChanged() {
     >
       <div class="card flex max-h-[90vh] w-full max-w-2xl flex-col gap-4 overflow-hidden">
         <div class="flex items-start justify-between gap-3">
-          <h2 class="text-lg font-semibold">{{ previewJob.title }}</h2>
+          <h2 class="min-w-0 text-lg font-semibold [overflow-wrap:anywhere]">{{ previewJob.title }}</h2>
           <button type="button" class="btn btn-ghost" aria-label="Close preview" @click="closePreview">
             <X class="size-4" />
           </button>

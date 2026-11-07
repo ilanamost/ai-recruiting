@@ -2,6 +2,10 @@
 
 Current queue:
 
+- [] When I ran the app on a real iphone13 device I got the following issues: 1. I cannot see the app content: I get 'Not authenticated' errors on all routes. 2. The app content is too close to the edges of the device, and part of the navbar is cut as a result. It should be adjusted to mobile devices sizes, there should be padding in the app pages and the navabar. | stack:full | plan:.plan/036-2026-11-07-mobile-iphone-auth-and-layout.md
+
+- [] Support a LLM_MODE=mock .env variable, so that analysis and scoring will work without an LLM model as well.
+
 - [V] Add a loader component, The loader will be displayed until each api call finishes running. Add it instead of the already existing loader. | plan:.plan/035-2026-11-01-global-api-loader.md
 
 - [V] Each Candidate type User should be able to edit only the Cvs that he has attached, not Cvs of other candidates. He should be able to delete the Cvs he attached as well and detuch them from a job | plan:.plan/009-2026-08-08-candidate-cv-ownership-scoping.md

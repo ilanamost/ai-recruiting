@@ -1,69 +1,51 @@
 === QA REPORT ===
-Ticket: .plan/035-2026-11-01-global-api-loader.md (Linear skipped per plan Q5)
-Scope: frontend-only
-Verdict: PASS (feature meets every Validation item that can run; findings below are low severity / follow-ups)
+Ticket: AI-108 — .plan/036-2026-11-07-mobile-iphone-auth-and-layout.md
+Scope: full stack (stack:full)
+Overall: FAIL (1 blocking issue in Validation, 1 functional gap on Safari). Bearer auth core, refresh rotation, cookie flow and safe-area CSS PASS.
 
-Static:      tsc PASS (`npx vue-tsc --noEmit`, exit 0) · lint N/A (no `lint` script, no linter installed; style rules verified by grep below)
-Unit:        790 passed, 0 failed (47 files) — 782 from the implementation + 8 new QA adversarial tests
-E2E:         not applicable (no Playwright config in frontend/)
-Backend:     not applicable, frontend-only task
+Static:      frontend vue-tsc --noEmit PASS (exit 0) · backend tsc --noEmit PASS (exit 0)
+             lint: NOT RUN — frontend/package.json has no `lint` script (plan Validation lists `npm run lint`; reported, not failed)
+Unit:        frontend 816 passed, 0 failed — but 1 of 50 test files FAILS (tests/auth-bearer.test.ts: "No test suite found")
+             + QA adversarial file tests/qa-bearer-auth.adversarial.test.ts: 9 passed, 0 failed
+E2E:         not applicable — no Playwright config or frontend/e2e in this repo
+Backend:     21 files, 403 passed, 0 failed (includes backend/tests/auth-bearer.test.ts, 28 tests)
+Build:       `vite build` PASS; compiled CSS contains every max(token, env(safe-area-inset-*)) rule and overflow-x:clip; dist index.html has viewport-fit=cover
 
-Plan Validation checklist:
-- `npm test` passes — PASS — 47 files / 790 tests passed
-- `npx vue-tsc --noEmit` passes — PASS — exit 0 (run before and after adding QA tests)
-- `npm run lint` passes — N/A — script does not exist in frontend/package.json; substituted grep checks:
-  - No trailing semicolons in changed/new TS/Vue — PASS — `git diff -U0 frontend/src | grep '^+.*;\s*$'` finds no added
-    code lines with a trailing `;`; new files loading.ts, AppLoader.vue, AppLoader.test.ts, lib/loading.test.ts have none.
-    The only hit in changed test files is a comment (tests/JobCvsModal.test.ts:250).
-  - No inline `style=` added — PASS — `git diff -U0 frontend/src | grep '^+.*style='` returns nothing. The existing `:style`
-    bindings (JobCvsModal.vue:515, MatchResult.vue:83, CvsListPage.vue:309, JobsListPage.vue:406) predate this change.
-    AppLoader test "uses no inline styles" passes.
-  - No new plain `.css` file — PASS — only src/main.css and src/styles/setup/tokens.css exist (both pre-existing); new
-    shared styles are in src/styles/cmps/loader.scss, imported from cmps/index.scss.
-- pendingCount 1 during pending apiFetch, 0 after resolve AND reject — PASS — tests/lib/loading.test.ts
-  "counts a pending apiFetch and releases it once the response resolves", "releases the count when the request rejects"
-- Two concurrent calls keep isLoading true until both settle — PASS — "keeps isLoading true until every concurrent call has settled"
-- 401 -> refresh -> retry keeps isLoading true throughout — PASS — "keeps isLoading true through a 401 → refresh → retry sequence"
-- AppLoader renders role="status" only while loading, spinner aria-hidden — PASS — tests/AppLoader.test.ts (5 tests:
-  nothing rendered when idle, aria-live="polite", bar and spinner aria-hidden="true", status removed after loading)
-- Grep proves removal — PASS — `grep -rnE "InitialLoader|initialLoader|app-loader" frontend/ --exclude-dir=node_modules --exclude-dir=dist`
-  returns nothing (exit 1). InitialLoader.vue, lib/initialLoader.ts, their tests and `#app-loader` in index.html are deleted.
-  No "Loading CVs/jobs", "Checking file", "Checking for an existing match" or "Scoring the match" text remains in src/.
-- Anti-flicker constants named in lib/ (Q3) — PASS — LOADER_SHOW_DELAY_MS=150, LOADER_MIN_VISIBLE_MS=300; 5 fake-timer tests in lib/loading.test.ts
-- Startup covered without pre-mount loader — PASS — tests/applicationStartup.test.ts (both the success and the navigation-failure
-  paths release the page load and reveal the shell)
+Acceptance criteria / Validation:
+- `cd frontend && npm test` passes — FAIL — exit code non-zero: `FAIL tests/auth-bearer.test.ts — Error: No test suite found` (file is 0 bytes, untracked)
+- `npx vue-tsc --noEmit` passes — PASS — exit 0
+- `npm run lint` passes — NOT APPLICABLE — no lint script exists
+- `cd backend && npm test` passes incl. bearer tests — PASS — 403/403; auth-bearer.test.ts covers bearer accept, expired/wrong-secret/garbage → 401, cookie-wins precedence, refresh via body, rotation, reuse → revoke-all, logout via body, CORS Authorization preflight, PATCH /me re-issue
+- index.html has viewport-fit=cover (test) — PASS — mobile-safe-area.test.ts "index.html opts into viewport-fit=cover"
+- 390px: no horizontal scroll, navbar items visible — PARTIAL/UNVERIFIED — style-contract tests pass (mobile-safe-area.test.ts: navbar flex-shrink, list-badge wrap, <main> padding); no Playwright viewport run possible (no Playwright in repo); needs manual check
+- iPhone 13 Safari: no "Not authenticated" on Home/Jobs/CVs/Settings — PARTIAL — API calls via apiFetch carry the bearer (http.test.ts, qa-bearer-auth adversarial "rapid parallel 401s…"); but direct browser loads still 401 (Finding 2). Needs a real device
+- Desktop cookie login unchanged — PASS — git diff of frontend/tests and backend/tests contains only additions (0 removed lines); all pre-existing cookie tests green; adversarial "logout with no stored tokens is the unchanged cookie-only request" PASS; backend "a valid cookie wins over …" PASS
+- Product definition "JWT access + rotating refresh-token cookies" — PASS — rotation preserved for body tokens (backend "reusing a rotated body token returns 401 and revokes every session")
 
-Acceptance criteria (.doc/product-definition.md) relevant to this task:
-- Reliability: all unit tests pass — PASS — 790/790
-- Reliability: linting passes — N/A — no linter configured; style-rule greps above all PASS
-- Styled per repo rules (Tailwind by default, shared SCSS, no trailing semicolons) — PASS — grep evidence above; loader.scss uses tokens
-  (var(--primary), var(--surface), var(--radius-full), var(--shadow-card-md))
-- No other product criterion (scoring, org scoping, LLM key isolation) is touched by this frontend-only change.
-
-QA adversarial tests (frontend/tests/loading.adversarial.test.ts, 8/8 pass):
-- 60 rapid concurrent apiFetch calls mixing 200 / 401-with-failed-refresh / network error -> counter returns to 0
-- 3 concurrent 401s coalesce into a single /api/auth/refresh; failed refresh releases every call
-- refresh fetch itself throwing -> caller gets the 401, counter 0
-- login with wrong password -> counted during fetch (1), rejects with ApiError, counter 0
-- logout network failure -> resolves, counter 0
-- 20 rapid start/stop cycles shorter than the show delay -> top bar never shows
-- a 60 s hung page load keeps the spinner visible, then hides once it settles
-- GAP (documents current behaviour): counter is 0 while the caller is still reading the response body
+Adversarial tests added (frontend/tests/qa-bearer-auth.adversarial.test.ts, all PASS):
+- 8 parallel 401s → exactly 1 refresh call, refresh body carries old refresh_token, all 8 retries carry rotated access token
+- failed refresh clears both stored tokens and does not retry
+- refresh 200 with empty/non-JSON body (cookie-only) keeps the stored pair and retries
+- malformed login body (non-string tokens) stores nothing and strips token fields from `user`
+- logout with no tokens = exact old request `{ method: 'POST', credentials: 'include' }`
+- logout clears tokens when fetch rejects
+- logout survives localStorage throwing SecurityError (Safari private mode)
+- FormData PATCH gets Authorization but no forced Content-Type
+- 16 KB access token sent verbatim
 
 Findings:
-- frontend/src/lib/http.ts:47-61 — expected: the top bar to stay up until the caller has its data; actual: trackRequest settles when
-  the Response headers arrive, so pendingCount drops to 0 before `response.json()` finishes (proved by the GAP test). Impact is low:
-  page-level loads wrap the whole store call with trackPageLoad, so only the non-blocking top bar can hide early on a slow body.
-  Optional fix: track at the store/API layer (wrap fetch + body parse) or accept and document it.
-- frontend/src/components/AppLoader.vue:12 — the role="status" live region is created by the same `v-if` that adds its content.
-  Several screen readers only announce changes to a live region that already exists in the DOM, so "Loading…" may not be
-  announced. This meets the plan's literal wording ("renders role=status only while loading"). Optional fix: keep the status
-  wrapper always mounted and toggle only the inner content.
-- Plan Step 7 not done — .doc/architecture.md has no description of the loader mechanism. The frontend role cannot write .doc/,
-  so the orchestrator or a human should add it.
-- frontend/package.json — plan Validation lists `npm run lint`, but no lint script or linter exists. Either add one or drop that
-  line from future plans.
-- Not verified (needs a browser, no e2e harness): no signed-out NavBar flash at startup, the z-[70] spinner sitting above the
-  Manage CVs modal and preview, and visual reduced-motion behaviour. The logic for each is unit-tested; the rendering is not.
+1. [BLOCKING] frontend/tests/auth-bearer.test.ts — expected a test suite (or no file), actual 0-byte untracked file → `npm test` exits non-zero. Fix: delete the file (coverage already lives in tests/http.test.ts, tests/auth.test.ts, tests/lib/token.test.ts), or fill it in.
+2. [HIGH — known gap, confirmed] URLs the browser loads directly cannot carry the bearer header, so on Safari (cookies dropped) they return 401:
+   - frontend/src/lib/auth.ts:47 profileImageUrl → <img> in src/components/NavBar.vue:124 and src/pages/SettingsPage.vue:160 → GET /api/auth/me/profile-image (backend/src/routes/auth.ts:330, requireAuth). Expected the avatar to render; actual a broken image on Safari.
+   - frontend/src/components/JobCvsModal.vue:606 <iframe :src="getResumeFileUrl(id)"> and :564 <a :href="getResumeFileUrl(id,{download:true})" download> → GET /api/resume/:id/file (backend/src/routes/resume.ts:152, requireAuth via router.use at :68). Expected preview/download; actual 401 JSON.
+   - Made worse by JobCvsModal.vue:292: the HEAD pre-check uses apiFetch, which now succeeds with the bearer, so previewFileStatus = 'ok' and the iframe shows the raw 401 body instead of the existing error fallback.
+   Suggested fix (needs a plan decision): fetch the file/image with apiFetch → blob → URL.createObjectURL (revoke it on change/unmount), or a short-lived signed `?token=` query that the backend accepts only on these GET routes.
+3. [LOW] backend/src/routes/auth.ts:155 — /logout is behind requireAuth. If the access token has expired (more than 15 min idle), logout returns 401 and the refresh token from the body is never revoked server-side. The client still clears localStorage (auth.ts finally block), but the refresh token stays valid until it expires. The cookie flow had the same behaviour before, but it matters more now: on Safari the refresh token sits in readable localStorage. Fix: make /logout not require a valid access token when a refresh token is present, or have the client refresh first.
+4. [LOW] backend/src/app.ts:21 — `allowedHeaders: ['Content-Type','Authorization']` replaces cors's default, which echoed back whatever headers the request asked for. The frontend currently sends only these two (grep of frontend/src), so nothing breaks today. Any header added later must be added to this list too.
+5. [LOW, multi-tab] Two tabs that both hit a 401 at the same moment refresh with the same refresh token from localStorage. The second refresh looks like reuse, and every session gets revoked. The in-module coalescing in frontend/src/lib/http.ts:63 only covers one tab. Cookies had the same cross-tab race, so this is not a regression. Noted because of rotation.
+6. [LOW, unverified on device] With viewport-fit=cover, fixed overlays use plain `p-4` (JobsListPage.vue:513 preview dialog, JobCvsModal.vue:388). In landscape that is smaller than the ~47 px side inset, so dialog edges can sit under the notch. The top-center Toaster also does not account for safe-area-inset-top. Check both on a device.
+7. [INFO] Plan Validation lists `npm run lint`, but no lint script exists. Either update the plan or add the script.
+
+Not verified (needs a real device/manual): iPhone 13 Safari end-to-end login, landscape padding, 390px horizontal scroll per page.
 
 STATUS: DONE
