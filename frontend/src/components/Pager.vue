@@ -39,7 +39,9 @@ function goNext() {
 <template>
   <!-- Same filter-strip treatment JobsListPage's row 2 uses (bg-bg + rounded-md + p-3), so the
        pager reads as page furniture rather than another content card. -->
-  <nav class="flex items-center justify-between gap-3 rounded-md bg-bg p-3" aria-label="Pagination">
+  <!-- flex-wrap + nowrap label (.plan/037): on a very narrow screen the items move to a new row
+       instead of "Page 2 of 10" splitting across lines. -->
+  <nav class="flex flex-wrap items-center justify-between gap-3 rounded-md bg-bg p-3" aria-label="Pagination">
     <button type="button" class="btn btn-ghost" :disabled="isFirstPage" aria-label="Previous page" @click="goPrev">
       <ChevronLeft class="size-4" />
       Prev
@@ -47,7 +49,7 @@ function goNext() {
 
     <!-- aria-live so a screen reader hears the page change, which is otherwise only visible in
          the list content that swapped out underneath. -->
-    <p class="text-sm text-fg-muted" aria-live="polite">Page {{ page }} of {{ totalPages }}</p>
+    <p class="text-sm whitespace-nowrap text-fg-muted" aria-live="polite">Page {{ page }} of {{ totalPages }}</p>
 
     <button type="button" class="btn btn-ghost" :disabled="isLastPage" aria-label="Next page" @click="goNext">
       Next

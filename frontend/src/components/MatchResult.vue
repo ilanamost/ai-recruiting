@@ -70,7 +70,7 @@ watch(() => [props.matchId, props.resumeId, props.jobId], run, { immediate: true
       <div class="flex items-center gap-2">
         <CircleCheck class="size-4 text-success" />
         <span
-          class="text-3xl font-bold"
+          class="text-3xl font-bold whitespace-nowrap"
           :class="{ 'score-reveal-pop': isHighScore, 'fade-in': isLowScore }"
         >
           {{ match.score }}<span class="text-base font-normal text-fg-muted">/100</span>

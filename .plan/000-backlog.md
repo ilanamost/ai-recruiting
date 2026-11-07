@@ -2,10 +2,6 @@
 
 Current queue:
 
-- [V] When I ran the app on a real iphone13 device I got the following issues: 1. I cannot see the app content: I get 'Not authenticated' errors on all routes. 2. The app content is too close to the edges of the device, and part of the navbar is cut as a result. It should be adjusted to mobile devices sizes, there should be padding in the app pages and the navabar. | stack:full | plan:.plan/036-2026-11-07-mobile-iphone-auth-and-layout.md
-
-- [] on an iphone 13 device - some of the texts appear cut, spread out to several rows instead of remaining on a single row - The attached cvs number and text in the Jobs route (like 3 cvs) for example, check if it happens in other places as well and fix. 
-
 - [] Support a LLM_MODE=mock .env variable, so that analysis and scoring will work without an LLM model as well.
 
 - [V] Add a loader component, The loader will be displayed until each api call finishes running. Add it instead of the already existing loader. | plan:.plan/035-2026-11-01-global-api-loader.md
@@ -62,6 +58,10 @@ What should I do next? | plan:.plan/017-2026-08-10-home-page.md
 - [V] Remove the abillity to upload and view a CV in a word format, I want the cvs in the application to be only in pdf format for consistency. Remove all logic and tests contencted to the word format and if there were relvant libraries installed, remove them. | plan:.plan/030-2026-09-08-remove-docx-cv-support.md
 
 - [V] I signed up as a candidate, and noticed that in the Cvs route I can view the cvs of the other users. I should be able to see only my own Cvs'. | plan:.plan/032-2026-09-10-candidate-cv-list-ownership-scoping.md
+
+- [V] When I ran the app on a real iphone13 device I got the following issues: 1. I cannot see the app content: I get 'Not authenticated' errors on all routes. 2. The app content is too close to the edges of the device, and part of the navbar is cut as a result. It should be adjusted to mobile devices sizes, there should be padding in the app pages and the navabar. | stack:full | plan:.plan/036-2026-11-07-mobile-iphone-auth-and-layout.md
+
+- [V] on an iphone 13 device - some of the texts appear cut, spread out to several rows instead of remaining on a single row - The attached cvs number and text in the Jobs route (like 3 cvs) for example, check if it happens in other places as well and fix. | plan:.plan/037-2026-11-07-mobile-text-wrapping.md
 
 ## DONE (Examples)
 

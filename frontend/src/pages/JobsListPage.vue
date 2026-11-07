@@ -418,7 +418,7 @@ async function onCvsChanged() {
             <span>Description</span>
             <textarea v-model="editDescription" rows="4" />
           </label>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
             <button type="button" class="btn btn-primary" :disabled="savingEdit" @click="saveEdit(job)">
               {{ savingEdit ? 'Saving…' : 'Save' }}
             </button>
@@ -428,7 +428,9 @@ async function onCvsChanged() {
 
         <template v-else>
           <div class="flex items-start justify-between gap-3">
-            <div class="flex flex-col gap-1">
+            <!-- min-w-0 + overflow-wrap (.plan/037): the CV count badge beside this column no
+                 longer shrinks, so the column gives way instead and a long unbroken title wraps. -->
+            <div class="flex min-w-0 flex-col gap-1 [overflow-wrap:anywhere]">
               <!-- Title and description both open the preview — the card's other click targets
                    (Edit/Duplicate/Manage CVs/Delete) stay untouched, and .stop keeps these
                    clicks from bubbling into any card-level handling (.plan/020 Q1). -->
@@ -446,7 +448,7 @@ async function onCvsChanged() {
             </span>
           </div>
           <div v-if="job.location" class="flex flex-wrap items-center gap-1.5">
-            <span class="list-badge">
+            <span class="list-badge list-badge-text">
               <MapPin class="size-3.5" />
               {{ job.location }}
             </span>
@@ -459,7 +461,7 @@ async function onCvsChanged() {
               This will detach {{ cvCount(job.id) }} CV{{ cvCount(job.id) === 1 ? '' : 's' }} from this job and
               delete their match results for it.
             </p>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
               <button
                 type="button"
                 class="btn btn-danger"
@@ -521,7 +523,7 @@ async function onCvsChanged() {
         </div>
 
         <div v-if="previewJob.location" class="flex flex-wrap items-center gap-1.5">
-          <span class="list-badge">
+          <span class="list-badge list-badge-text">
             <MapPin class="size-3.5" />
             {{ previewJob.location }}
           </span>

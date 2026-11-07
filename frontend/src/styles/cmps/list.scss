@@ -9,13 +9,17 @@
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
+  flex-shrink: 0;
   max-width: 100%;
 }
 
-/* .plan/036: a long CV file name or job location in a nowrap badge was wider than a 390px
-   iPhone row. On mobile the badge wraps (anywhere, since file names have no spaces) instead. */
+/* .plan/037: only badges holding user-supplied text (CV file name, job title, job location)
+   may wrap on mobile — anywhere, since file names have no spaces. Short badges such as the
+   "3 CVs" count stay on one row on every screen size. */
 @media (max-width: 767px) {
-  .list-badge {
+  .list-badge-text {
+    flex-shrink: 1;
+    min-width: 0;
     white-space: normal;
     overflow-wrap: anywhere;
   }
