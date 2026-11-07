@@ -8,7 +8,9 @@ import { useAuth } from '../lib/auth'
 const route = useRoute()
 const router = useRouter()
 const { theme, toggleTheme } = useTheme()
-const { user, profileImageUrl, logout } = useAuth()
+// profileImageSrc, not profileImageUrl (.plan/036 R2-2): a blob URL fetched with the bearer
+// header, so the avatar also loads on iOS Safari. Null while loading or on failure → User icon.
+const { user, profileImageSrc, logout } = useAuth()
 
 const menuOpen = ref(false)
 const mobileMenuOpen = ref(false)
@@ -121,7 +123,7 @@ async function onLogout() {
       </button>
 
       <span class="avatar avatar-sm">
-        <img v-if="profileImageUrl" :src="profileImageUrl" alt="Profile" />
+        <img v-if="profileImageSrc" :src="profileImageSrc" alt="Profile" />
         <User v-else class="size-4" />
       </span>
 

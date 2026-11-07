@@ -10,7 +10,8 @@ vi.mock('../../src/lib/api', async (importOriginal) => ({
   uploadResume: vi.fn(),
   updateResume: vi.fn(),
   replaceResumeFile: vi.fn(),
-  deleteResume: vi.fn()
+  deleteResume: vi.fn(),
+  fetchResumeFileBlob: vi.fn()
 }))
 
 vi.mock('vue-sonner', () => ({
@@ -272,6 +273,27 @@ describe('resume store', () => {
 
       expect(toast.error).not.toHaveBeenCalled()
       expect(store.resumes.map((resume) => resume.id)).toEqual(['resume-1', 'resume-2'])
+      expect(store.loadError).toBeNull()
+    })
+  })
+  // .plan/036 R2-2: a pure pass-through for JobCvsModal's preview and download — no state, no
+  // toast; the failure goes back to the component, which owns the error state / toast.
+  describe('fetchResumeFileBlob', () => {
+    it('returns the blob from lib/api for the given id and options', async () => {
+      const blob = new Blob(['%PDF-1.4'])
+      vi.mocked(api.fetchResumeFileBlob).mockResolvedValue(blob)
+      const store = useResumeStore()
+
+      await expect(store.fetchResumeFileBlob('resume-1', { download: true })).resolves.toBe(blob)
+      expect(api.fetchResumeFileBlob).toHaveBeenCalledWith('resume-1', { download: true })
+    })
+
+    it('propagates a failure untouched without toasting or setting loadError', async () => {
+      vi.mocked(api.fetchResumeFileBlob).mockRejectedValue(new Error('CV file not found'))
+      const store = useResumeStore()
+
+      await expect(store.fetchResumeFileBlob('resume-1')).rejects.toThrow('CV file not found')
+      expect(toast.error).not.toHaveBeenCalled()
       expect(store.loadError).toBeNull()
     })
   })

@@ -151,7 +151,7 @@ const mockProfileImageUrl = ref<string | null>(null)
 const mockLogout = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('../src/lib/auth', () => ({
-  useAuth: () => ({ user: mockUser, profileImageUrl: mockProfileImageUrl, logout: mockLogout })
+  useAuth: () => ({ user: mockUser, profileImageUrl: mockProfileImageUrl, profileImageSrc: mockProfileImageUrl, logout: mockLogout })
 }))
 
 import NavBar from '../src/components/NavBar.vue'

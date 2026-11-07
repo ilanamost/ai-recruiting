@@ -4,6 +4,7 @@ import {
   attachResumeToJob,
   detachResumeFromJob,
   duplicateJob,
+  fetchResumeFileBlob,
   getResumeFileUrl,
   listJobResumes,
   listJobs,
@@ -98,6 +99,50 @@ describe('lib/api — job/CV attach, duplicate, file endpoints', () => {
     expect(getResumeFileUrl('resume-1', { download: true })).toBe(
       'http://localhost:3001/api/resume/resume-1/file?download=1'
     )
+  })
+
+  // .plan/036 R2-2: the preview iframe and the download can't send the bearer header themselves,
+  // so they get the bytes from this helper, which goes through apiFetch.
+  it('fetchResumeFileBlob GETs the inline file with the bearer header and returns its blob', async () => {
+    localStorage.setItem('access_token', 'access-abc')
+    const blob = new Blob(['%PDF-1.4'], { type: 'application/pdf' })
+    fetchMock.mockResolvedValue({ ok: true, status: 200, blob: async () => blob } as Response)
+
+    try {
+      const result = await fetchResumeFileBlob('resume-1')
+
+      expect(result).toBe(blob)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      const [url, init] = fetchMock.mock.calls[0]
+      expect(url).toBe('http://localhost:3001/api/resume/resume-1/file')
+      expect(init.method).toBeUndefined()
+      expect(init.credentials).toBe('include')
+      expect(new Headers(init.headers).get('Authorization')).toBe('Bearer access-abc')
+    } finally {
+      localStorage.clear()
+    }
+  })
+
+  it('fetchResumeFileBlob requests the attachment variant with download', async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 200, blob: async () => new Blob() } as Response)
+
+    await fetchResumeFileBlob('resume-1', { download: true })
+
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/api/resume/resume-1/file?download=1', {
+      credentials: 'include'
+    })
+  })
+
+  it('fetchResumeFileBlob throws an ApiError from the error body on a non-ok response', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ error: { code: 'not_found', message: 'CV file not found' } }, { ok: false, status: 404 })
+    )
+
+    const error = await fetchResumeFileBlob('resume-1').catch((err) => err)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error.code).toBe('not_found')
+    expect(error.message).toBe('CV file not found')
   })
 
   it('replaceResumeFile PUTs multipart form data with the new file', async () => {

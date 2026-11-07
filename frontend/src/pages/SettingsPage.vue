@@ -6,7 +6,9 @@ import { ApiError } from '../lib/http'
 import { useAuth } from '../lib/auth'
 import { TOAST } from '../lib/toastMessages'
 
-const { user, profileImageUrl, updateProfile, fetchMe } = useAuth()
+// profileImageUrl answers "is an image stored?" (drives Replace/Remove); profileImageSrc is
+// what the <img> actually shows — a blob URL fetched with the bearer header (.plan/036 R2-2).
+const { user, profileImageUrl, profileImageSrc, updateProfile, fetchMe } = useAuth()
 
 const name = ref('')
 const email = ref('')
@@ -157,7 +159,7 @@ async function onSubmit() {
             :aria-label="hasImage ? 'Replace profile image' : 'Add profile image'"
             @click="triggerFilePicker"
           >
-            <img v-if="previewUrl || profileImageUrl" :src="(previewUrl ?? profileImageUrl) as string" alt="Profile" />
+            <img v-if="previewUrl || profileImageSrc" :src="(previewUrl || profileImageSrc) as string" alt="Profile" />
             <span v-else class="avatar-picker-placeholder">
               <Camera class="size-5" />
               <span>Add photo</span>

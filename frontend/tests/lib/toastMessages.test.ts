@@ -17,7 +17,8 @@ describe('TOAST module shape', () => {
 
   it('exposes every success and error constant the call sites reference', () => {
     expect(Object.keys(TOAST.success)).toHaveLength(14)
-    expect(Object.keys(TOAST.error)).toHaveLength(16)
+    // 16 from .plan/026, plus resumeDownloadFailed (.plan/036 R2-2, the download button).
+    expect(Object.keys(TOAST.error)).toHaveLength(17)
   })
 
   it('keeps keys unique across the flattened success and error groups', () => {

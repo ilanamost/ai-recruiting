@@ -17,6 +17,8 @@ const mockUser = ref<Record<string, unknown>>({
   has_profile_image: false
 })
 const mockProfileImageUrl = ref<string | null>(null)
+// .plan/036 R2-2: the <img> shows lib/auth's blob URL; profileImageUrl only says one is stored.
+const mockProfileImageSrc = ref<string | null>(null)
 const mockUpdateProfile = vi.fn()
 const mockFetchMe = vi.fn()
 
@@ -24,6 +26,7 @@ vi.mock('../src/lib/auth', () => ({
   useAuth: () => ({
     user: mockUser,
     profileImageUrl: mockProfileImageUrl,
+    profileImageSrc: mockProfileImageSrc,
     updateProfile: mockUpdateProfile,
     fetchMe: mockFetchMe
   })
@@ -52,6 +55,7 @@ describe('SettingsPage — image selection survives a failed submit', () => {
       has_profile_image: false
     }
     mockProfileImageUrl.value = null
+    mockProfileImageSrc.value = null
     mockUpdateProfile.mockReset()
     mockFetchMe.mockReset()
   })

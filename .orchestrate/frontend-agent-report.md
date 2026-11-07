@@ -27,3 +27,27 @@ Handoff:
 - Token store lives in lib/token.ts rather than lib/auth.ts (plan step 5) to avoid an auth.ts <-> http.ts import cycle.
 
 STATUS: DONE
+
+=== REVISION 2 — R2-2 (browser-loaded files 401 on iOS Safari) ===
+Ticket: AI-106 (.plan/036 Revision 2, R2-2). Not committed. base.scss (R2-1) untouched by this pass.
+
+Files changed:
+- frontend/src/lib/api.ts — new fetchResumeFileBlob(id, { download? }): Promise<Blob> via apiFetch (+ parseErrorResponse on !ok); getResumeFileUrl kept
+- frontend/src/stores/resume.ts — fetchResumeFileBlob pass-through (keeps .plan/018: components call stores)
+- frontend/src/lib/auth.ts — reactive profileImageSrc (object URL) fetched via apiFetch whenever profileImageUrl changes (incl. version bumps); cleared on logout / has_profile_image false; previous URL revoked; stale responses ignored; fetch errors swallowed. Exported from useAuth(); profileImageUrl unchanged
+- frontend/src/components/NavBar.vue — <img> uses profileImageSrc (User icon while loading / on failure)
+- frontend/src/pages/SettingsPage.vue — <img> uses previewUrl || profileImageSrc; hasImage/removeImage still key off profileImageUrl (an image is stored)
+- frontend/src/components/JobCvsModal.vue — preview: GET via store instead of HEAD, iframe :src = blob URL, revoked on close/switch/unmount, request token guards stale responses, failure -> existing inline message. Download: <button class="btn btn-ghost"> fetching ?download=1, anchor click with download=file_name, URL revoked after 10s (Safari reads the blob asynchronously), disabled per row while busy, toast on failure (ApiError message, else TOAST.error.resumeDownloadFailed)
+- frontend/src/lib/toastMessages.ts — TOAST.error.resumeDownloadFailed = 'Failed to download CV'
+- Tests: tests/auth-profile-image-src.test.ts (new); tests/api.test.ts, tests/stores/resume.test.ts, tests/JobCvsModal.test.ts, tests/qa-docx-removal.adversarial.test.ts, tests/NavBar.test.ts, tests/SettingsPage.test.ts extended/updated; lib/api + useAuth mocks gained fetchResumeFileBlob / profileImageSrc in the other suites; toast-constant pin tests (tests/lib/toastMessages.test.ts, tests/qa-toast-constants.adversarial.test.ts) extended for the one new constant
+
+Unit tests: 848 passed, 0 failed (51 files)
+Typecheck: npx vue-tsc --noEmit clean
+API contract: unchanged — no new endpoints (existing GET /api/resume/:id/file[?download=1] and GET /api/auth/me/profile-image, now called with the bearer header)
+
+Handoff:
+- Backend: nothing new; those two GETs must honor Authorization: Bearer (already in requireAuth) and CORS must allow it.
+- QA on iPhone Safari: avatar shows in navbar + settings (and updates after upload); Manage CVs preview renders (first page only in iOS iframe — known Safari limit) and Download saves with the CV's file name.
+- Note: the avatar fetch goes through apiFetch, so it counts toward the global request loader like any other API call.
+
+STATUS: DONE

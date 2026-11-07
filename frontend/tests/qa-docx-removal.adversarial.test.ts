@@ -29,7 +29,9 @@ vi.mock('../src/lib/api', async (importOriginal) => ({
   getMatch: vi.fn(),
   getResumeFileUrl: vi.fn((id: string, options?: { download?: boolean }) =>
     `http://localhost:3001/api/resume/${id}/file${options?.download ? '?download=1' : ''}`
-  )
+  ),
+  // .plan/036 R2-2: real implementation, so the stubbed global fetch stays the network boundary.
+  fetchResumeFileBlob: (await importOriginal<typeof import('../src/lib/api')>()).fetchResumeFileBlob
 }))
 
 vi.mock('vue-sonner', () => ({
@@ -116,6 +118,9 @@ async function openRow(wrapper: ReturnType<typeof mountModal>, name: string) {
   await flushPromises()
 }
 
+const originalCreateObjectURL = URL.createObjectURL
+const originalRevokeObjectURL = URL.revokeObjectURL
+
 describe('JobCvsModal — legacy non-PDF CV (.plan/030 adversarial)', () => {
   let fetchMock: ReturnType<typeof vi.fn>
 
@@ -137,12 +142,21 @@ describe('JobCvsModal — legacy non-PDF CV (.plan/030 adversarial)', () => {
     vi.mocked(createMatch).mockReset().mockResolvedValue(undefined as never)
     vi.mocked(getMatch).mockReset().mockResolvedValue(undefined as never)
 
-    fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 })
+    // .plan/036 R2-2: the preview GETs the bytes and shows them from an object URL.
+    fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      blob: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' }))
+    })
     vi.stubGlobal('fetch', fetchMock)
+    URL.createObjectURL = vi.fn(() => 'blob:healthy-pdf')
+    URL.revokeObjectURL = vi.fn()
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    URL.createObjectURL = originalCreateObjectURL
+    URL.revokeObjectURL = originalRevokeObjectURL
   })
 
   it('does not leave the error state stuck when a PDF is opened after a legacy CV', async () => {
@@ -153,12 +167,12 @@ describe('JobCvsModal — legacy non-PDF CV (.plan/030 adversarial)', () => {
     expect(wrapper.text()).toContain(FALLBACK)
     expect(wrapper.find('iframe').exists()).toBe(false)
 
-    // Switching to a healthy PDF must recover: the HEAD check runs and the iframe renders.
+    // Switching to a healthy PDF must recover: the file GET runs and the iframe renders its blob.
     await openRow(wrapper, 'Jane Doe')
     expect(wrapper.text()).not.toContain(FALLBACK)
     const iframe = wrapper.find('iframe')
     expect(iframe.exists()).toBe(true)
-    expect(iframe.attributes('src')).toBe('http://localhost:3001/api/resume/resume-1/file')
+    expect(iframe.attributes('src')).toBe('blob:healthy-pdf')
   })
 
   it('does not leave the ok state stuck when a legacy CV is opened after a healthy PDF', async () => {
@@ -172,6 +186,8 @@ describe('JobCvsModal — legacy non-PDF CV (.plan/030 adversarial)', () => {
     await openRow(wrapper, 'John Smith')
     expect(wrapper.text()).toContain(FALLBACK)
     expect(wrapper.find('iframe').exists()).toBe(false)
+    // ...and the healthy PDF's object URL was released on the switch (.plan/036 R2-2).
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:healthy-pdf')
   })
 
   it('shows the fallback for a missing, empty, or malformed mime_type rather than crashing', async () => {
@@ -204,16 +220,30 @@ describe('JobCvsModal — legacy non-PDF CV (.plan/030 adversarial)', () => {
     expect(requestedUrls).toEqual(['http://localhost:3001/api/resume/resume-1/file'])
   })
 
-  it('still offers a download link for a legacy CV — the backend serves those bytes unchanged', async () => {
+  it('still offers a download for a legacy CV — the backend serves those bytes unchanged', async () => {
     const wrapper = mountModal()
     await flushPromises()
 
     await openRow(wrapper, 'John Smith')
 
-    // The download link lives on each list row, so scope the lookup to the legacy CV's own row —
-    // an unscoped findAll would return the healthy PDF's link and pass for the wrong reason.
+    // The download button lives on each list row, so scope the lookup to the legacy CV's own row —
+    // an unscoped findAll would return the healthy PDF's button and pass for the wrong reason.
+    // Since .plan/036 R2-2 it is a button that fetches the bytes (bearer-capable), not a link.
     const legacyRow = wrapper.findAll('li').find((li) => li.text().includes('John Smith'))
-    const downloadLink = legacyRow?.findAll('a').find((a) => a.text().includes('Download'))
-    expect(downloadLink?.attributes('href')).toBe('http://localhost:3001/api/resume/resume-2/file?download=1')
+    const downloadButton = legacyRow?.findAll('button').find((btn) => btn.text().includes('Download'))
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    vi.useFakeTimers({ toFake: ['setTimeout'] })
+    try {
+      fetchMock.mockClear()
+      await downloadButton?.trigger('click')
+      await flushPromises()
+      expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+        'http://localhost:3001/api/resume/resume-2/file?download=1'
+      ])
+      expect(clickSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+      clickSpy.mockRestore()
+    }
   })
 })

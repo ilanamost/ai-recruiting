@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { ChevronDown, Download, FileText, Star, Unlink, X } from '@lucide/vue'
 import { EXPERIENCE_LEVELS, skillLabel, yearsToLevel } from '../lib/experience'
-// getResumeFileUrl is a pure URL builder, not a request, so it stays a direct lib/api import —
-// every actual call goes through the stores below (.plan/018).
-import { getResumeFileUrl, UNPAGED_LIMIT } from '../lib/api'
-import { apiFetch } from '../lib/http'
+// UNPAGED_LIMIT is a constant, not a request — every actual call goes through the stores below
+// (.plan/018), including the CV file fetches behind the preview and download (.plan/036 R2-2).
+import { UNPAGED_LIMIT } from '../lib/api'
+import { ApiError } from '../lib/http'
 import { trackPageLoad } from '../lib/loading'
 import { cardEnterDelay } from '../lib/animation'
 import { useAuth } from '../lib/auth'
@@ -83,9 +83,20 @@ const detachingId = ref<string | null>(null)
 const detachBusy = ref(false)
 
 const previewResume = ref<JobResume | null>(null)
-// The PDF file-existence HEAD check behind the preview iframe: 'error' also covers a resume
-// carrying a legacy non-PDF mime_type, which has no previewable form left (.plan/030).
+// The PDF fetch behind the preview iframe: 'error' also covers a resume carrying a legacy
+// non-PDF mime_type, which has no previewable form left (.plan/030).
 const previewFileStatus = ref<'checking' | 'ok' | 'error'>('ok')
+// .plan/036 R2-2: the iframe can't send `Authorization: Bearer` itself (iOS Safari has no
+// cross-site cookies), so the file is fetched through apiFetch and shown from this object URL.
+// One live URL at most — revoked on close, on switching CVs, and on unmount.
+const previewFileSrc = ref<string | null>(null)
+// Bumped per preview load so a slow response for an earlier selection — even of the same CV —
+// can never land on (or leak an object URL past) a newer one.
+let previewRequest = 0
+const downloadingId = ref<string | null>(null)
+// How long a download's object URL outlives the click. Revoking synchronously right after
+// click() can cancel the save on Safari, which starts reading the blob asynchronously.
+const DOWNLOAD_URL_TTL_MS = 10_000
 const previewMatchLoading = ref(false)
 const previewMatchId = ref<string | undefined>(undefined)
 
@@ -268,8 +279,18 @@ async function load() {
 }
 
 onMounted(load)
+onBeforeUnmount(revokePreviewFile)
+
+function revokePreviewFile() {
+  if (previewFileSrc.value) {
+    URL.revokeObjectURL(previewFileSrc.value)
+    previewFileSrc.value = null
+  }
+}
 
 function closePreview() {
+  previewRequest += 1
+  revokePreviewFile()
   previewResume.value = null
   previewFileStatus.value = 'ok'
   previewMatchLoading.value = false
@@ -282,17 +303,24 @@ async function loadPreviewExtras(resume: JobResume) {
   // resolves straight to the same "file couldn't be loaded" state a broken PDF shows rather than
   // calling an endpoint that no longer exists.
   const isPdf = resume.mime_type === 'application/pdf'
+  revokePreviewFile()
   previewFileStatus.value = isPdf ? 'checking' : 'error'
   previewMatchLoading.value = true
   previewMatchId.value = undefined
 
-  const stillCurrent = () => previewResume.value?.id === resume.id
+  previewRequest += 1
+  const request = previewRequest
+  const stillCurrent = () => request === previewRequest && previewResume.value?.id === resume.id
 
+  // A GET of the bytes, not the old HEAD check: the same request both proves the file exists and
+  // gives the iframe something it can load without auth headers.
   const fileCheck = isPdf
-    ? apiFetch(getResumeFileUrl(resume.id), { method: 'HEAD' })
-        .then((response) => {
+    ? resumeStore
+        .fetchResumeFileBlob(resume.id)
+        .then((blob) => {
           if (stillCurrent()) {
-            previewFileStatus.value = response.ok ? 'ok' : 'error'
+            previewFileSrc.value = URL.createObjectURL(blob)
+            previewFileStatus.value = 'ok'
           }
         })
         .catch(() => {
@@ -335,6 +363,33 @@ function selectPreview(resume: JobResume) {
   }
   previewResume.value = resume
   void loadPreviewExtras(resume)
+}
+
+// .plan/036 R2-2: a plain `<a href download>` is fetched by the browser without the bearer
+// header and 401s on iOS Safari, so the bytes come through apiFetch and are saved from a
+// short-lived object URL under the CV's own file name.
+async function downloadResume(resume: JobResume) {
+  if (downloadingId.value === resume.id) {
+    return
+  }
+  downloadingId.value = resume.id
+  try {
+    const blob = await resumeStore.fetchResumeFileBlob(resume.id, { download: true })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = resume.file_name
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_TTL_MS)
+  } catch (err) {
+    // Only a server-shaped ApiError carries user-facing copy; a network TypeError's "Failed to
+    // fetch" (or a missing createObjectURL) gets the constant instead.
+    toast.error(err instanceof ApiError ? err.message : TOAST.error.resumeDownloadFailed)
+  } finally {
+    downloadingId.value = null
+  }
 }
 
 async function attach() {
@@ -560,14 +615,15 @@ async function confirmDetach(resume: JobResume) {
               </div>
             </div>
             <div v-else class="flex gap-2" @click.stop>
-              <a
-                :href="getResumeFileUrl(resume.id, { download: true })"
+              <button
+                type="button"
                 class="btn btn-ghost"
-                download
+                :disabled="downloadingId === resume.id"
+                @click="downloadResume(resume)"
               >
                 <Download class="size-4" />
                 Download
-              </a>
+              </button>
               <button v-if="canDetach(resume)" type="button" class="btn btn-ghost" @click="startDetach(resume)">
                 <Unlink class="size-4" />
                 Detach
@@ -601,9 +657,9 @@ async function confirmDetach(resume: JobResume) {
         <div v-else-if="previewFileStatus === 'error'" class="flex items-center gap-2 text-danger">
           <span>This CV's file couldn't be loaded — replace it from the CVs page.</span>
         </div>
-        <div v-else class="h-[65vh] min-h-[24rem]">
+        <div v-else-if="previewFileSrc" class="h-[65vh] min-h-[24rem]">
           <iframe
-            :src="getResumeFileUrl(previewResume.id)"
+            :src="previewFileSrc"
             :title="`Preview of ${previewResume.file_name}`"
             class="h-full w-full rounded-md border border-border"
           />

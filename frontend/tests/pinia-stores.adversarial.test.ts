@@ -38,6 +38,7 @@ vi.mock('../src/lib/api', async (importOriginal) => ({
   replaceResumeFile: vi.fn(),
   deleteResume: vi.fn(),
   getResumeFileUrl: vi.fn(() => 'http://localhost:3001/api/resume/r1/file'),
+  fetchResumeFileBlob: vi.fn(),
   createMatch: vi.fn(),
   getMatch: vi.fn(),
   getMatchForPair: vi.fn(),

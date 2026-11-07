@@ -41,7 +41,8 @@ vi.mock('../src/lib/api', async (importOriginal) => ({
   replaceResumeFile: vi.fn(),
   uploadResume: vi.fn(),
   listJobResumes: vi.fn(),
-  getResumeFileUrl: vi.fn(() => 'http://localhost:3001/api/resume/resume-1/file')
+  getResumeFileUrl: vi.fn(() => 'http://localhost:3001/api/resume/resume-1/file'),
+  fetchResumeFileBlob: vi.fn()
 }))
 
 vi.mock('vue-sonner', () => ({
@@ -147,7 +148,9 @@ describe('all 30 constants match the plan Scope tables byte for byte', () => {
     resumeDetachFailed: 'Failed to detach CV',
     matchLoadFailed: 'Failed to load match scores',
     matchLookupFailed: 'Failed to look up an existing match',
-    settingsImageRemoveFailed: 'Failed to remove profile image'
+    settingsImageRemoveFailed: 'Failed to remove profile image',
+    // Not in .plan/026's tables: added by .plan/036 R2-2 for JobCvsModal's fetch-based download.
+    resumeDownloadFailed: 'Failed to download CV'
   }
 
   it.each(Object.entries(successCopy))('TOAST.success.%s is exactly %j', (key, copy) => {

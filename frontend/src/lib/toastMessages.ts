@@ -36,6 +36,7 @@ export const TOAST = {
     resumeUploadFailed: 'Failed to upload CV',
     resumeAttachFailed: 'Failed to attach CV',
     resumeDetachFailed: 'Failed to detach CV',
+    resumeDownloadFailed: 'Failed to download CV',
     matchLoadFailed: 'Failed to load match scores',
     matchLookupFailed: 'Failed to look up an existing match',
     settingsImageRemoveFailed: 'Failed to remove profile image'

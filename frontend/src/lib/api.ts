@@ -166,6 +166,18 @@ export function getResumeFileUrl(id: string, options?: { download?: boolean }): 
   return `${API_URL}/api/resume/${id}/file${query}`
 }
 
+// .plan/036 R2-2: `<iframe src>` and `<a download>` are loaded by the browser itself and can't
+// carry `Authorization: Bearer`, so on iOS Safari (no cross-site cookies) they 401. Fetching the
+// bytes through apiFetch sends the bearer header (and gets its 401 refresh-retry); the caller
+// turns the Blob into an object URL.
+export async function fetchResumeFileBlob(id: string, options?: { download?: boolean }): Promise<Blob> {
+  const response = await apiFetch(getResumeFileUrl(id, options))
+  if (!response.ok) {
+    return parseErrorResponse(response)
+  }
+  return response.blob()
+}
+
 export async function replaceResumeFile(id: string, file: File): Promise<Resume> {
   const formData = new FormData()
   formData.append('file', file)
