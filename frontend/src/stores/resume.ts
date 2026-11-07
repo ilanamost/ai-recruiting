@@ -81,6 +81,12 @@ export const useResumeStore = defineStore('resume', () => {
     await reloadPage()
   }
 
+  // The CV's bytes for the preview iframe / download button (.plan/036 R2-2). Pure pass-through —
+  // the caller owns the object URL's lifetime and raises its own failure state or toast.
+  async function fetchResumeFileBlob(id: string, options?: { download?: boolean }) {
+    return api.fetchResumeFileBlob(id, options)
+  }
+
   return {
     resumes,
     loadError,
@@ -92,6 +98,7 @@ export const useResumeStore = defineStore('resume', () => {
     uploadResume,
     updateResume,
     replaceResumeFile,
-    deleteResume
+    deleteResume,
+    fetchResumeFileBlob
   }
 })

@@ -18,7 +18,10 @@ vi.mock('../src/lib/api', async (importOriginal) => ({
   getMatch: vi.fn(),
   getResumeFileUrl: vi.fn((id: string, options?: { download?: boolean }) =>
     `http://localhost:3001/api/resume/${id}/file${options?.download ? '?download=1' : ''}`
-  )
+  ),
+  // .plan/036 R2-2: the real implementation, so the stubbed global fetch below stays the network
+  // boundary and these tests see the actual URL, method and Authorization header it sends.
+  fetchResumeFileBlob: (await importOriginal<typeof import('../src/lib/api')>()).fetchResumeFileBlob
 }))
 
 vi.mock('vue-sonner', () => ({
@@ -160,6 +163,15 @@ function skillChipLabels(wrapper: ReturnType<typeof mountModal>) {
   return wrapper.findAll('[aria-pressed]').map((chip) => chip.text())
 }
 
+// A successful GET of a CV file — the preview and download read its bytes via blob().
+function fileResponse() {
+  return { ok: true, status: 200, blob: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })) }
+}
+
+const originalCreateObjectURL = URL.createObjectURL
+const originalRevokeObjectURL = URL.revokeObjectURL
+let objectUrlCount = 0
+
 describe('JobCvsModal', () => {
   let fetchMock: ReturnType<typeof vi.fn>
 
@@ -185,12 +197,26 @@ describe('JobCvsModal', () => {
     vi.mocked(toast.success).mockClear()
     vi.mocked(toast.error).mockClear()
 
-    fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 })
+    fetchMock = vi.fn().mockResolvedValue(fileResponse())
     vi.stubGlobal('fetch', fetchMock)
+
+    // jsdom has no object URLs. Each call hands out a distinct blob: URL so revocation can be
+    // checked per URL.
+    objectUrlCount = 0
+    URL.createObjectURL = vi.fn(() => {
+      objectUrlCount += 1
+      return `blob:file-${objectUrlCount}`
+    })
+    URL.revokeObjectURL = vi.fn()
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    URL.createObjectURL = originalCreateObjectURL
+    URL.revokeObjectURL = originalRevokeObjectURL
+    localStorage.clear()
+    // Drops any pending download-URL revoke timer a test left behind.
+    vi.useRealTimers()
   })
 
   it('lists the CVs attached to the job with file name and attached date', async () => {
@@ -296,12 +322,106 @@ describe('JobCvsModal', () => {
     expect(wrapper.text()).toContain('Match result')
   })
 
-  it('renders a download link pointing at the file endpoint with download=1', async () => {
-    const wrapper = mountModal()
-    await flushPromises()
+  // .plan/036 R2-2: a browser-loaded `<a href download>` can't send the bearer header (iOS
+  // Safari), so Download is a button that fetches the bytes and saves them from an object URL.
+  describe('download (.plan/036 R2-2)', () => {
+    function downloadButton(wrapper: ReturnType<typeof mountModal>, name: string) {
+      const row = wrapper.findAll('li').find((li) => li.text().includes(name))
+      return row?.findAll('button').find((btn) => btn.text().includes('Download'))
+    }
 
-    const downloadLink = wrapper.findAll('a').find((a) => a.text().includes('Download'))
-    expect(downloadLink?.attributes('href')).toBe('http://localhost:3001/api/resume/resume-1/file?download=1')
+    it('is a button, not a direct link to the file endpoint', async () => {
+      const wrapper = mountModal()
+      await flushPromises()
+
+      expect(wrapper.findAll('a').some((a) => a.text().includes('Download'))).toBe(false)
+      expect(downloadButton(wrapper, 'Jane Doe')?.classes()).toEqual(expect.arrayContaining(['btn', 'btn-ghost']))
+    })
+
+    it('fetches download=1 with the bearer header, clicks an anchor named after the CV, then revokes the URL', async () => {
+      localStorage.setItem('access_token', 'access-abc')
+      const clicked: { href: string; download: string }[] = []
+      const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+        clicked.push({ href: this.href, download: this.download })
+      })
+      vi.useFakeTimers({ toFake: ['setTimeout'] })
+      try {
+        const wrapper = mountModal()
+        await flushPromises()
+
+        await downloadButton(wrapper, 'Jane Doe')?.trigger('click')
+        await flushPromises()
+
+        const [url, init] = fetchMock.mock.calls[0]
+        expect(url).toBe('http://localhost:3001/api/resume/resume-1/file?download=1')
+        expect(init.credentials).toBe('include')
+        expect(new Headers(init.headers).get('Authorization')).toBe('Bearer access-abc')
+
+        expect(clicked).toEqual([{ href: 'blob:file-1', download: 'jane.pdf' }])
+        // The temporary anchor doesn't linger in the document.
+        expect(document.querySelector('a[download]')).toBeNull()
+        // Not revoked synchronously (Safari reads the blob after click), but revoked soon after.
+        expect(URL.revokeObjectURL).not.toHaveBeenCalled()
+        vi.runAllTimers()
+        expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:file-1')
+        expect(toast.error).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+        clickSpy.mockRestore()
+      }
+    })
+
+    it('disables the button while the download is in flight', async () => {
+      let resolveFile!: (value: unknown) => void
+      fetchMock.mockReturnValue(new Promise((resolve) => {
+        resolveFile = resolve
+      }))
+      const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+      vi.useFakeTimers({ toFake: ['setTimeout'] })
+      const wrapper = mountModal()
+      await flushPromises()
+
+      await downloadButton(wrapper, 'Jane Doe')?.trigger('click')
+      expect(downloadButton(wrapper, 'Jane Doe')?.attributes('disabled')).toBeDefined()
+      // Other rows stay usable.
+      expect(downloadButton(wrapper, 'John Smith')?.attributes('disabled')).toBeUndefined()
+
+      resolveFile(fileResponse())
+      await flushPromises()
+      expect(downloadButton(wrapper, 'Jane Doe')?.attributes('disabled')).toBeUndefined()
+      clickSpy.mockRestore()
+    })
+
+    it('shows the server error as a toast when the download request fails', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ error: { code: 'not_found', message: 'CV file not found' } })
+      })
+      const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click')
+      const wrapper = mountModal()
+      await flushPromises()
+
+      await downloadButton(wrapper, 'Jane Doe')?.trigger('click')
+      await flushPromises()
+
+      expect(toast.error).toHaveBeenCalledWith('CV file not found')
+      expect(clickSpy).not.toHaveBeenCalled()
+      expect(URL.createObjectURL).not.toHaveBeenCalled()
+      expect(downloadButton(wrapper, 'Jane Doe')?.attributes('disabled')).toBeUndefined()
+      clickSpy.mockRestore()
+    })
+
+    it('falls back to the TOAST constant on a network failure', async () => {
+      fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+      const wrapper = mountModal()
+      await flushPromises()
+
+      await downloadButton(wrapper, 'Jane Doe')?.trigger('click')
+      await flushPromises()
+
+      expect(toast.error).toHaveBeenCalledWith('Failed to download CV')
+    })
   })
 
   it('renders the attached-CVs list without a preview dialog until a CV is selected', async () => {
@@ -320,17 +440,70 @@ describe('JobCvsModal', () => {
     await row?.trigger('click')
     await flushPromises()
 
+    // A GET of the bytes (no more HEAD check) — .plan/036 R2-2.
     expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/api/resume/resume-1/file', {
-      method: 'HEAD',
       credentials: 'include'
     })
     expect(getMatchForPair).toHaveBeenCalledWith('job-1', 'resume-1')
 
+    // The iframe loads the fetched blob, never the auth-protected endpoint itself.
     const iframe = wrapper.find('iframe')
     expect(iframe.exists()).toBe(true)
-    expect(iframe.attributes('src')).toBe('http://localhost:3001/api/resume/resume-1/file')
+    expect(iframe.attributes('src')).toBe('blob:file-1')
 
     expect(wrapper.findAll('.fixed.inset-0')).toHaveLength(2)
+  })
+
+  it('sends the bearer header on the preview fetch when the client holds an access token', async () => {
+    localStorage.setItem('access_token', 'access-abc')
+    const wrapper = mountModal()
+    await flushPromises()
+
+    const row = wrapper.findAll('li').find((li) => li.text().includes('Jane Doe'))
+    await row?.trigger('click')
+    await flushPromises()
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('http://localhost:3001/api/resume/resume-1/file')
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer access-abc')
+    expect(wrapper.find('iframe').attributes('src')).toBe('blob:file-1')
+  })
+
+  it('revokes the previous blob URL when switching to another CV, and the last one on unmount', async () => {
+    const wrapper = mountModal()
+    await flushPromises()
+
+    await wrapper.findAll('li').find((li) => li.text().includes('Jane Doe'))?.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('iframe').attributes('src')).toBe('blob:file-1')
+
+    await wrapper.findAll('li').find((li) => li.text().includes('John Smith'))?.trigger('click')
+    await flushPromises()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:file-1')
+    expect(wrapper.find('iframe').attributes('src')).toBe('blob:file-2')
+
+    wrapper.unmount()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:file-2')
+  })
+
+  it('ignores a stale preview response that resolves after the user switched CVs', async () => {
+    const resolvers: ((value: unknown) => void)[] = []
+    fetchMock.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)))
+    const wrapper = mountModal()
+    await flushPromises()
+
+    await wrapper.findAll('li').find((li) => li.text().includes('Jane Doe'))?.trigger('click')
+    await wrapper.findAll('li').find((li) => li.text().includes('John Smith'))?.trigger('click')
+
+    // John's response lands first, then Jane's stale one.
+    resolvers[1](fileResponse())
+    await flushPromises()
+    resolvers[0](fileResponse())
+    await flushPromises()
+
+    expect(wrapper.find('iframe').attributes('src')).toBe('blob:file-1')
+    // The stale bytes never became an object URL, so nothing leaked.
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
   })
 
   // Legacy data (.plan/030): CVs are PDF-only now, but rows uploaded as DOCX before the change
@@ -353,19 +526,34 @@ describe('JobCvsModal', () => {
 
     expect(wrapper.text()).toContain("This CV's file couldn't be loaded — replace it from the CVs page.")
     expect(wrapper.find('iframe').exists()).toBe(false)
-    // No HTML-preview call, and no HEAD check either — nothing is fetched for a non-PDF CV.
+    // No HTML-preview call, and no file GET either — nothing is fetched for a non-PDF CV.
     expect(fetchMock).not.toHaveBeenCalled()
     // The status resolves synchronously, so no page-level load is left behind (.plan/035).
     expect(useLoading().pagePendingCount.value).toBe(0)
   })
 
-  it('shows an inline failure message instead of a broken iframe when the file HEAD check fails', async () => {
-    fetchMock.mockResolvedValue({ ok: false, status: 404 })
+  it('shows an inline failure message instead of a broken iframe when the file fetch fails', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 404, json: () => Promise.resolve({}) })
     const wrapper = mountModal()
     await flushPromises()
 
     const row = wrapper.findAll('li').find((li) => li.text().includes('Jane Doe'))
     await row?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('iframe').exists()).toBe(false)
+    expect(wrapper.text()).toContain("This CV's file couldn't be loaded — replace it from the CVs page.")
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+    // The preview failure is inline only — no toast on top of it.
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  it('shows the same failure message when the file fetch rejects (network error)', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    const wrapper = mountModal()
+    await flushPromises()
+
+    await wrapper.findAll('li').find((li) => li.text().includes('Jane Doe'))?.trigger('click')
     await flushPromises()
 
     expect(wrapper.find('iframe').exists()).toBe(false)
@@ -414,6 +602,8 @@ describe('JobCvsModal', () => {
     expect(wrapper.find('iframe').exists()).toBe(false)
     expect(wrapper.findAll('.fixed.inset-0')).toHaveLength(1)
     expect(wrapper.emitted('close')).toBeFalsy()
+    // Closing releases the preview's object URL (.plan/036 R2-2).
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:file-1')
   })
 
   it('emits close when the modal close button is clicked', async () => {
@@ -1289,8 +1479,17 @@ describe('JobCvsModal', () => {
     expect(wrapper.findAll('button').some((btn) => btn.text().includes('Attach CV'))).toBe(false)
     expect(wrapper.findAll('button').some((btn) => btn.text().includes('Detach'))).toBe(false)
 
-    const downloadLink = wrapper.findAll('a').find((a) => a.text().includes('Download'))
-    expect(downloadLink?.attributes('href')).toBe('http://localhost:3001/api/resume/resume-1/file?download=1')
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    vi.useFakeTimers({ toFake: ['setTimeout'] })
+    const downloadButton = wrapper.findAll('button').find((btn) => btn.text().includes('Download'))
+    expect(downloadButton?.attributes('disabled')).toBeUndefined()
+    await downloadButton?.trigger('click')
+    await flushPromises()
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/api/resume/resume-1/file?download=1', {
+      credentials: 'include'
+    })
+    expect(clickSpy).toHaveBeenCalledTimes(1)
+    clickSpy.mockRestore()
   })
 
   // .plan/035: the modal's inline "Loading CVs…", "Checking file…" and "Checking for an existing
@@ -1332,7 +1531,7 @@ describe('JobCvsModal', () => {
       expect(wrapper.text()).not.toContain('Checking file')
       expect(wrapper.find('iframe').exists()).toBe(false)
 
-      resolveHead({ ok: true, status: 200 })
+      resolveHead(fileResponse())
       await flushPromises()
 
       expect(pagePendingCount.value).toBe(0)

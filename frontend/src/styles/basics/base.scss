@@ -273,3 +273,23 @@ input:focus-visible {
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+// iOS Safari zooms the page when a focused field's font-size is under 16px (the 0.875rem used
+// by the field rules above) and keeps that zoom on the next page. Kept at the end of the file so
+// it wins over the later `select` rule at equal specificity (.plan/036).
+@media (max-width: 639px) {
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='date'],
+  input[type='search'],
+  textarea,
+  select {
+    font-size: 1rem;
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}

@@ -1,6 +1,6 @@
 Status: active
 Owner: Ilana
-Last updated: 2026-11-07
+Last updated: 2026-11-07 (rev. 2)
 
 ## Goal
 Make the app usable on a real iPhone 13 (Safari): (1) stop the "Not authenticated" error on
@@ -90,3 +90,38 @@ compatible, deploy first), then frontend token usage.
 ## Rollback
 Revert the branch. Backend change is additive (cookie path untouched), so a frontend revert
 alone restores prior behavior.
+
+## Revision 2 — post-deploy findings (2026-11-07)
+Bearer login now works on the iPhone, but real-device testing found three remaining problems.
+Same branch and Linear ticket (AI-106); user asked to proceed without a new approval gate.
+
+**R2-1 Input zoom (layout).** Cause: iOS Safari zooms a focused field whose `font-size` is
+under 16px; the shared field rules use `0.875rem`, and the zoom persists to the next page,
+which also made content look flush to the edges. The first fix was lost/overridden (a later
+`select` rule has equal specificity). Fix: 16px fields at `max-width: 639px`, placed at the
+end of `frontend/src/styles/basics/base.scss`, plus `text-size-adjust: 100%` on `html`.
+We deliberately do **not** set `maximum-scale=1` (it blocks user pinch-zoom, an
+accessibility regression).
+
+**R2-2 Browser-loaded files return 401 on Safari.** Cause: `<img src>`, `<iframe src>` and
+`<a download>` are loaded by the browser itself and cannot send `Authorization: Bearer`.
+Fix (frontend only, backend unchanged): fetch each file through `apiFetch` (bearer + 401
+refresh-retry), turn the response into a `Blob`, and use an object URL:
+- avatar (`NavBar.vue`, `SettingsPage.vue`, `lib/auth.ts`): fetch `/api/auth/me/profile-image`
+  into a blob URL; re-fetch when `profileImageUrl` changes; revoke the old URL.
+- CV preview (`JobCvsModal.vue`): replace the HEAD check with a GET of the file; the blob URL
+  feeds the iframe; a failed fetch shows the existing "file couldn't be loaded" state;
+  revoke on close/switch.
+- CV download (`JobCvsModal.vue`): button that fetches `?download=1` through `apiFetch` and
+  saves the blob with the CV's file name; failure shows a toast from the component.
+- Helper in `frontend/src/lib/api.ts` (`fetchResumeFileBlob`); `getResumeFileUrl` stays.
+
+**R2-3 Validation additions.**
+- Tests: `base.scss` has the 16px mobile rule after the `select` rule; file helpers send the
+  bearer header; blob URLs are created and revoked; failed fetch shows the error state/toast.
+- Existing suites + `vue-tsc` stay green.
+- On iPhone Safari: no zoom when focusing login fields or on the next page; Manage CVs
+  dialog previews and downloads a CV; avatar shows in navbar and settings.
+
+**Risks.** Blob PDFs in an iOS `<iframe>` show only the first page (Safari limitation) —
+acceptable for preview; download remains available. Object URLs must be revoked to avoid leaks.

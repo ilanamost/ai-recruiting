@@ -5,10 +5,17 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 const mockUser = ref<Record<string, unknown> | null>(null)
 const mockProfileImageUrl = ref<string | null>(null)
+// .plan/036 R2-2: the <img> renders lib/auth's blob URL, not the raw endpoint URL.
+const mockProfileImageSrc = ref<string | null>(null)
 const mockLogout = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('../src/lib/auth', () => ({
-  useAuth: () => ({ user: mockUser, profileImageUrl: mockProfileImageUrl, logout: mockLogout })
+  useAuth: () => ({
+    user: mockUser,
+    profileImageUrl: mockProfileImageUrl,
+    profileImageSrc: mockProfileImageSrc,
+    logout: mockLogout
+  })
 }))
 
 import NavBar from '../src/components/NavBar.vue'
@@ -38,6 +45,7 @@ describe('NavBar', () => {
       has_profile_image: false
     }
     mockProfileImageUrl.value = null
+    mockProfileImageSrc.value = null
     mockLogout.mockClear()
   })
 
@@ -161,15 +169,32 @@ describe('NavBar', () => {
     expect(wrapper.find('.avatar img').exists()).toBe(false)
   })
 
-  it('renders the uploaded profile image when set', async () => {
-    mockProfileImageUrl.value = 'http://localhost:3001/api/auth/me/profile-image'
+  it('renders the uploaded profile image from its blob URL when set', async () => {
+    mockProfileImageUrl.value = 'http://localhost:3001/api/auth/me/profile-image?v=0'
+    mockProfileImageSrc.value = 'blob:avatar-1'
     const router = makeRouter()
     await router.push('/')
     const wrapper = mount(NavBar, { global: { plugins: [router] } })
 
     const img = wrapper.find('.avatar img')
     expect(img.exists()).toBe(true)
-    expect(img.attributes('src')).toBe('http://localhost:3001/api/auth/me/profile-image')
+    // Never the endpoint itself: a browser-loaded <img src> can't send the bearer header (iOS).
+    expect(img.attributes('src')).toBe('blob:avatar-1')
+  })
+
+  it('keeps the fallback icon while the image is still loading or failed to load', async () => {
+    // profileImageUrl set (an image is stored) but no blob yet — must not render a broken <img>.
+    mockProfileImageUrl.value = 'http://localhost:3001/api/auth/me/profile-image?v=0'
+    mockProfileImageSrc.value = null
+    const router = makeRouter()
+    await router.push('/')
+    const wrapper = mount(NavBar, { global: { plugins: [router] } })
+
+    expect(wrapper.find('.avatar img').exists()).toBe(false)
+
+    mockProfileImageSrc.value = 'blob:avatar-2'
+    await flushPromises()
+    expect(wrapper.find('.avatar img').attributes('src')).toBe('blob:avatar-2')
   })
 
   it('opens and closes the settings menu, showing User settings and Logout with icons', async () => {

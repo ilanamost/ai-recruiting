@@ -12,6 +12,8 @@ const mockUser = ref<Record<string, unknown>>({
   has_profile_image: false
 })
 const mockProfileImageUrl = ref<string | null>(null)
+// .plan/036 R2-2: the <img> shows lib/auth's blob URL; profileImageUrl only says one is stored.
+const mockProfileImageSrc = ref<string | null>(null)
 const mockUpdateProfile = vi.fn()
 const mockFetchMe = vi.fn()
 
@@ -19,6 +21,7 @@ vi.mock('../src/lib/auth', () => ({
   useAuth: () => ({
     user: mockUser,
     profileImageUrl: mockProfileImageUrl,
+    profileImageSrc: mockProfileImageSrc,
     updateProfile: mockUpdateProfile,
     fetchMe: mockFetchMe
   })
@@ -48,6 +51,7 @@ describe('SettingsPage', () => {
       has_profile_image: false
     }
     mockProfileImageUrl.value = null
+    mockProfileImageSrc.value = null
     mockUpdateProfile.mockReset()
     mockFetchMe.mockReset()
     vi.mocked(toast.success).mockClear()
@@ -276,6 +280,7 @@ describe('SettingsPage', () => {
     mockUpdateProfile.mockImplementation(async () => {
       // Mirrors lib/auth: a successful save flips has_profile_image and republishes a versioned URL.
       mockProfileImageUrl.value = 'http://localhost:3001/api/auth/me/profile-image?v=1'
+      mockProfileImageSrc.value = 'blob:server-avatar-v1'
       return { ...mockUser.value, has_profile_image: true }
     })
 
@@ -287,11 +292,10 @@ describe('SettingsPage', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    // The local blob preview is released and the avatar falls back to the cache-busted server URL.
+    // The local blob preview is released and the avatar falls back to the freshly fetched
+    // server image (lib/auth's blob URL for the cache-busted ?v=1 endpoint).
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-url')
-    expect(wrapper.find('.avatar img').attributes('src')).toBe(
-      'http://localhost:3001/api/auth/me/profile-image?v=1'
-    )
+    expect(wrapper.find('.avatar img').attributes('src')).toBe('blob:server-avatar-v1')
 
     await wrapper.find('.avatar-picker-remove').trigger('click')
     await flushPromises()

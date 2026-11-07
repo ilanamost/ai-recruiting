@@ -4,7 +4,7 @@
 // fallback for browsers that drop cross-site cookies (iOS Safari): login/signup/refresh bodies
 // also carry `access_token`/`refresh_token`, which lib/token.ts keeps in localStorage.
 
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { apiFetch, parseErrorResponse } from './http'
 import { trackRequest } from './loading'
 import { clearTokens, getRefreshToken, takeTokens, withAuthHeader } from './token'
@@ -46,6 +46,50 @@ const profileImageVersion = ref(0)
 const profileImageUrl = computed(() =>
   user.value?.has_profile_image ? `${API_URL}/api/auth/me/profile-image?v=${profileImageVersion.value}` : null
 )
+
+// .plan/036 R2-2: an `<img src>` is loaded by the browser itself and can't carry
+// `Authorization: Bearer`, so on iOS Safari (no cross-site cookies) pointing it at
+// profileImageUrl 401s. Instead the image is fetched through apiFetch and shown from an object
+// URL. profileImageUrl stays the "which image, which version" key: every change to it (login,
+// a version bump after updateProfile, logout, has_profile_image turning false) re-runs this.
+const profileImageSrc = ref<string | null>(null)
+// Only the newest request may write profileImageSrc — a slow response for an older version
+// must not overwrite (or revoke) the image a later request already put up.
+let profileImageRequest = 0
+
+function setProfileImageSrc(next: string | null) {
+  if (profileImageSrc.value) {
+    URL.revokeObjectURL(profileImageSrc.value)
+  }
+  profileImageSrc.value = next
+}
+
+async function loadProfileImage(url: string | null) {
+  profileImageRequest += 1
+  const request = profileImageRequest
+  if (!url) {
+    setProfileImageSrc(null)
+    return
+  }
+  try {
+    const response = await apiFetch(url)
+    if (!response.ok) {
+      throw new Error(`profile image ${response.status}`)
+    }
+    const blob = await response.blob()
+    if (request === profileImageRequest) {
+      setProfileImageSrc(URL.createObjectURL(blob))
+    }
+  } catch {
+    // Best-effort: the avatar is decorative, so a failed load just falls back to the default
+    // icon (NavBar's User, SettingsPage's "Add photo") rather than surfacing an error.
+    if (request === profileImageRequest) {
+      setProfileImageSrc(null)
+    }
+  }
+}
+
+watch(profileImageUrl, loadProfileImage, { immediate: true })
 
 // The login/signup/logout/refresh endpoints manage the session itself, so they go through the
 // plain fetch (not apiFetch's 401-retry loop, which only makes sense for already-authenticated
@@ -178,5 +222,5 @@ async function updateProfile(input: UpdateProfileInput): Promise<AuthUser> {
 }
 
 export function useAuth() {
-  return { user, isLoading, profileImageUrl, login, signup, logout, fetchMe, updateProfile }
+  return { user, isLoading, profileImageUrl, profileImageSrc, login, signup, logout, fetchMe, updateProfile }
 }

@@ -29,7 +29,8 @@ vi.mock('../src/lib/api', async (importOriginal) => ({
   listLatestMatchesForJob: vi.fn(),
   createMatch: vi.fn(),
   getMatch: vi.fn(),
-  getResumeFileUrl: vi.fn((id: string) => `http://localhost:3001/api/resume/${id}/file`)
+  getResumeFileUrl: vi.fn((id: string) => `http://localhost:3001/api/resume/${id}/file`),
+  fetchResumeFileBlob: vi.fn()
 }))
 
 vi.mock('vue-sonner', () => ({
