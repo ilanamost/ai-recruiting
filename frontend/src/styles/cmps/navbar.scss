@@ -79,6 +79,8 @@
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--fg-muted);
+  /* .plan/037: "New job" must not split onto two lines when the desktop row gets tight. */
+  white-space: nowrap;
   transition: background-color 0.15s ease, color 0.15s ease;
 
   &:hover {
@@ -134,6 +136,7 @@
   font-weight: 500;
   color: var(--fg-muted);
   text-align: left;
+  white-space: nowrap;
 
   &:hover {
     color: var(--fg);

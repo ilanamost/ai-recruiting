@@ -1,5 +1,4 @@
 {
-  "frontend": { "id": "AI-106", "url": "https://linear.app/ai-dev-agents/issue/AI-106/fe-iphone-layout-safe-area-fixes-bearer-token-auth-client" },
-  "backend": { "id": "AI-107", "url": "https://linear.app/ai-dev-agents/issue/AI-107/be-bearer-token-auth-fallback-for-safari" },
-  "qa": { "id": "AI-108", "url": "https://linear.app/ai-dev-agents/issue/AI-108/qa-iphone-layout-and-safari-auth" }
+  "frontend": { "id": "AI-114", "url": "https://linear.app/ai-dev-agents/issue/AI-114/fe-keep-short-badges-on-one-row-on-mobile" },
+  "qa": { "id": "AI-115", "url": "https://linear.app/ai-dev-agents/issue/AI-115/qa-mobile-text-wrapping" }
 }

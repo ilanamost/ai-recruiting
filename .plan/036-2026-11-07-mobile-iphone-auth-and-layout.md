@@ -1,6 +1,6 @@
-Status: active
+Status: done
 Owner: Ilana
-Last updated: 2026-11-07 (rev. 2)
+Last updated: 2026-11-07
 
 ## Goal
 Make the app usable on a real iPhone 13 (Safari): (1) stop the "Not authenticated" error on

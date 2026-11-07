@@ -240,6 +240,49 @@ describe('JobsListPage', () => {
     expect(wrapper.text()).toContain('0 CVs')
   })
 
+  // .plan/037: the short CV count badge must never wrap on mobile, so it stays a plain
+  // .list-badge; only the user-supplied location badge opts into .list-badge-text.
+  it('keeps the CV count badge single-line and lets only the location badge wrap', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const badges = wrapper.findAll('li .list-badge')
+    const countBadges = badges.filter((badge) => /\d+ CVs?$/.test(badge.text()))
+    const locationBadges = badges.filter((badge) => badge.text().includes('Berlin, Germany'))
+
+    expect(countBadges).toHaveLength(2)
+    for (const badge of countBadges) {
+      expect(badge.classes()).not.toContain('list-badge-text')
+    }
+    expect(locationBadges).toHaveLength(1)
+    expect(locationBadges[0].classes()).toContain('list-badge-text')
+  })
+
+  it('renders no wrapping text badge on a card without a location', async () => {
+    vi.mocked(listJobs).mockResolvedValue(pageOf([jobs[1]]))
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.findAll('li .list-badge')).toHaveLength(1)
+    expect(wrapper.findAll('.list-badge-text')).toHaveLength(0)
+  })
+
+  it('uses the same badge split in the job preview dialog', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const backendCard = wrapper.findAll('li').find((li) => li.text().includes('Backend Engineer'))
+    await backendCard!.find('p.font-semibold').trigger('click')
+
+    const dialog = wrapper.find('div.fixed')
+    const badges = dialog.findAll('.list-badge')
+    const countBadge = badges.find((badge) => badge.text().includes('2 CVs'))
+    const locationBadge = badges.find((badge) => badge.text().includes('Berlin, Germany'))
+
+    expect(countBadge?.classes()).not.toContain('list-badge-text')
+    expect(locationBadge?.classes()).toContain('list-badge-text')
+  })
+
   it('shows an empty state when there are no jobs', async () => {
     vi.mocked(listJobs).mockResolvedValue(pageOf([]))
     vi.mocked(listResumes).mockResolvedValue(pageOf([]))

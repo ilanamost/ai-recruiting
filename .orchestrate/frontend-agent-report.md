@@ -1,53 +1,76 @@
 === FRONTEND AGENT REPORT ===
-Ticket: AI-106 (.plan/036-2026-11-07-mobile-iphone-auth-and-layout.md)
-Branch: feat/mobile-iphone-auth-and-layout-fixes (not committed)
+Ticket: AI-114 (.plan/037-2026-11-07-mobile-text-wrapping.md)
+Branch: feat/mobile-text-wrapping (not committed)
 
 Files changed:
-- frontend/index.html (viewport-fit=cover)
-- frontend/src/App.vue (<main> padding via --page-pad + safe-area insets; overflow-x-clip shell)
-- frontend/src/styles/setup/tokens.css (--navbar-pad-x, --navbar-pad-y, --page-pad + sm override)
-- frontend/src/styles/cmps/navbar.scss (safe-area padding on navbar and mobile panel; brand/actions flex-shrink: 0)
-- frontend/src/styles/cmps/list.scss (.list-badge wraps on mobile)
-- frontend/src/pages/CvsListPage.vue, frontend/src/pages/JobsListPage.vue, frontend/src/components/JobCvsModal.vue (min-w-0 + overflow-wrap on long names/emails/titles)
-- frontend/src/lib/token.ts (new: localStorage token store, try/catch wrapped; takeTokens, withAuthHeader)
-- frontend/src/lib/http.ts (Bearer header; refresh with body token, store rotated pair, clear on rejected refresh; credentials: 'include' kept)
-- frontend/src/lib/auth.ts (login/signup/updateProfile store + strip tokens; logout sends bearer + body refresh token, clears tokens)
-- frontend/tests/lib/token.test.ts (new), frontend/tests/mobile-safe-area.test.ts (new), frontend/tests/http.test.ts, frontend/tests/auth.test.ts (extended)
+- frontend/src/styles/cmps/list.scss — .list-badge is `white-space: nowrap; flex-shrink: 0` at every size; the
+  blanket max-width:767px `.list-badge` override from .plan/036 is removed; new `.list-badge-text` rule under
+  `@media (max-width: 767px)`: `flex-shrink: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere`
+- frontend/src/pages/JobsListPage.vue — `list-badge-text` on the location badge (card + preview dialog); CV count
+  badges (card + preview) left as plain `.list-badge`; title/description column gets `min-w-0 [overflow-wrap:anywhere]`;
+  edit Save/Cancel row and delete-confirm row get `flex-wrap`
+- frontend/src/pages/CvsListPage.vue — `list-badge-text` on the file name badge and the job title badges; edit
+  Save/Cancel row and delete-confirm row get `flex-wrap`
+- frontend/src/components/JobCvsModal.vue — `list-badge-text` on the file name badge; detach-confirm row and
+  Download/Detach row get `flex-wrap`
+- frontend/src/styles/basics/base.scss — `.btn` gets `white-space: nowrap`
+- frontend/src/styles/cmps/navbar.scss — `.navbar-link` and `.navbar-menu-item` get `white-space: nowrap`
+- frontend/src/styles/cmps/avatar.scss — `.avatar-picker-placeholder` ("Add photo") gets `white-space: nowrap`
+- frontend/src/components/FilterTabs.vue — tablist gets `flex-wrap`, tabs get `whitespace-nowrap`
+- frontend/src/components/Pager.vue — nav gets `flex-wrap`, "Page N of M" gets `whitespace-nowrap`
+- frontend/src/components/MatchResult.vue — score ("82/100") gets `whitespace-nowrap`
+- frontend/tests/mobile-text-wrapping.test.ts (new) — style contract on the compiled SCSS
+- frontend/tests/mobile-safe-area.test.ts — the .plan/036 assertion now targets `.list-badge-text` (it asserted the old
+  blanket rule)
+- frontend/tests/JobsListPage.test.ts, CvsListPage.test.ts, JobCvsModal.test.ts — badge class tests
 
-Unit tests: 816 passed, 0 failed (49 files)
-E2E tests: none — this Vue app has no Playwright setup
-Typecheck: npx vue-tsc --noEmit clean
-Lint: no `lint` script or ESLint config exists in frontend/package.json — not run
-API contract: .orchestrate/api-contract.yaml (bearer fallback: token pair in login/signup/refresh bodies, refresh/logout body token, requireAuth bearer, PATCH /me rotated pair)
+Unit tests: 860 passed, 0 failed (52 files, `npx vitest run`)
+Typecheck: `npx vue-tsc --noEmit` clean
+E2E tests: none; this app has no Playwright setup
+Built CSS check (`vite build` into a scratch dir): `.list-badge{…white-space:nowrap;flex-shrink:0…}` sits outside any
+media query; `.list-badge-text{white-space:normal;overflow-wrap:anywhere;flex-shrink:1;min-width:0}` sits only inside
+`@media (width<=767px)`.
+API contract: no change (styling only)
+
+## Audit (390px, reasoned from code/CSS)
+
+| Component | Result | Change |
+|---|---|---|
+| Jobs card: "N CVs" badge | Bug confirmed in code: the badge was allowed to shrink and to wrap on mobile, so "3 CVs" broke onto two rows | nowrap + flex-shrink:0 (base `.list-badge`); the title column now takes the squeeze (`min-w-0`, overflow-wrap) |
+| Jobs card: location badge | Long user text, must wrap | `list-badge-text` |
+| Job preview: count badge / location badge / "Created …" | Footer row already `flex-wrap`; badge now nowrap | location → `list-badge-text`; count unchanged |
+| Jobs card buttons (Edit/Duplicate/Manage CVs/Delete) | Row already `flex-wrap`; labels could split inside a button | `.btn` nowrap |
+| Jobs edit Save/Cancel, delete Confirm/Cancel rows | `flex` with no wrap | `flex-wrap` |
+| Jobs filter strip (Location, Job creation date, Applied, Rows per page) | Already `flex-wrap`, labels short | none |
+| CVs card: file name badge, job title badges | Long user text | `list-badge-text` |
+| CVs header (h1 + Upload CV / Cancel upload) | Fits at 390px | none (button nowrap via `.btn`) |
+| CVs edit / delete-confirm rows | `flex` with no wrap | `flex-wrap` |
+| "Created …" / "Uploaded …" / "Attached …" lines | Full-width `<p>`, short text | none |
+| Manage CVs dialog: file name badge | Long user text | `list-badge-text` |
+| Manage CVs dialog: Download/Detach, Confirm detach/Cancel rows | `flex` with no wrap | `flex-wrap` |
+| Manage CVs dialog: attach row, filter strip, skill chips, Clear filters | Already `flex-wrap`; Clear filters already `shrink-0` | none (button nowrap via `.btn`) |
+| FilterTabs (All/Junior/Mid/Senior) | Fits (about 250px of about 286px available) but had no protection | tabs `whitespace-nowrap`, tablist `flex-wrap` |
+| Pager (Prev · Page N of M · Next) | Fits (about 290px of about 318px) but the label could wrap on a narrower screen | label `whitespace-nowrap`, nav `flex-wrap` |
+| MatchResult score line | Single token, low risk | `whitespace-nowrap` (defensive) |
+| Navbar mobile menu (New job/Jobs/CVs) | Full-width column panel, fine at 390px | `.navbar-link` nowrap (also protects the tight 768–900px desktop row) |
+| Navbar settings menu (User settings/Logout) | min-width 10rem, OK | `.navbar-menu-item` nowrap (defensive) |
+| Home page: accordion headers, steps, features, action buttons | Headers use `justify-between` with a `shrink-0` chevron; action row already `flex-wrap` | none (button nowrap via `.btn`) |
+| Login / Sign up | Single column card (max-w-sm); "Sign up"/"Log in" inline links fit on one line | none |
+| Settings: "Add photo" placeholder in the 4rem avatar | Could wrap inside the circle | `.avatar-picker-placeholder` nowrap |
+| Settings: fields, "Admin (set via database)", Save changes | Column layout, fits | none |
+| Job form (New job) | Column layout | none |
+
+## What was verified and what was not
+- Verified: unit tests, typecheck, and the compiled CSS output (both the Sass compile in tests and a real `vite build`).
+- **Not checked in a browser or on a device.** No headless browser (Playwright/Puppeteer) is installed in `frontend/`,
+  and the list pages need the backend and a logged-in user. The audit above is reasoned from the templates and CSS,
+  and the pixel widths are estimates. Plan Validation items still open for QA/the user: 390px device mode for 0/1/25 CVs,
+  a 60-character file name and a long location with no horizontal scroll, and the iPhone 13 check after a private-tab load
+  (Safari may cache the old CSS).
 
 Handoff:
-- Backend: implement the contract — login/signup return { ...toAuthUser(user), access_token, refresh_token }; refresh returns { access_token, refresh_token }; refresh/logout fall back to body refresh_token; requireAuth accepts Authorization: Bearer; CORS allows the Authorization header; PATCH /me returns the rotated pair when it calls issueSession.
-- Known gap: URLs loaded directly by the browser (avatar <img src> /api/auth/me/profile-image, CV <iframe>/<a download> file URLs) cannot carry a bearer header, so on iOS Safari they will still 401. Fix needs a follow-up (fetch as blob via apiFetch + object URL, or short-lived signed URLs).
-- QA: verify at 390x844 (and landscape) that navbar items and page edges clear the notch/home indicator; verify desktop cookie login unchanged.
-- Token store lives in lib/token.ts rather than lib/auth.ts (plan step 5) to avoid an auth.ts <-> http.ts import cycle.
-
-STATUS: DONE
-
-=== REVISION 2 — R2-2 (browser-loaded files 401 on iOS Safari) ===
-Ticket: AI-106 (.plan/036 Revision 2, R2-2). Not committed. base.scss (R2-1) untouched by this pass.
-
-Files changed:
-- frontend/src/lib/api.ts — new fetchResumeFileBlob(id, { download? }): Promise<Blob> via apiFetch (+ parseErrorResponse on !ok); getResumeFileUrl kept
-- frontend/src/stores/resume.ts — fetchResumeFileBlob pass-through (keeps .plan/018: components call stores)
-- frontend/src/lib/auth.ts — reactive profileImageSrc (object URL) fetched via apiFetch whenever profileImageUrl changes (incl. version bumps); cleared on logout / has_profile_image false; previous URL revoked; stale responses ignored; fetch errors swallowed. Exported from useAuth(); profileImageUrl unchanged
-- frontend/src/components/NavBar.vue — <img> uses profileImageSrc (User icon while loading / on failure)
-- frontend/src/pages/SettingsPage.vue — <img> uses previewUrl || profileImageSrc; hasImage/removeImage still key off profileImageUrl (an image is stored)
-- frontend/src/components/JobCvsModal.vue — preview: GET via store instead of HEAD, iframe :src = blob URL, revoked on close/switch/unmount, request token guards stale responses, failure -> existing inline message. Download: <button class="btn btn-ghost"> fetching ?download=1, anchor click with download=file_name, URL revoked after 10s (Safari reads the blob asynchronously), disabled per row while busy, toast on failure (ApiError message, else TOAST.error.resumeDownloadFailed)
-- frontend/src/lib/toastMessages.ts — TOAST.error.resumeDownloadFailed = 'Failed to download CV'
-- Tests: tests/auth-profile-image-src.test.ts (new); tests/api.test.ts, tests/stores/resume.test.ts, tests/JobCvsModal.test.ts, tests/qa-docx-removal.adversarial.test.ts, tests/NavBar.test.ts, tests/SettingsPage.test.ts extended/updated; lib/api + useAuth mocks gained fetchResumeFileBlob / profileImageSrc in the other suites; toast-constant pin tests (tests/lib/toastMessages.test.ts, tests/qa-toast-constants.adversarial.test.ts) extended for the one new constant
-
-Unit tests: 848 passed, 0 failed (51 files)
-Typecheck: npx vue-tsc --noEmit clean
-API contract: unchanged — no new endpoints (existing GET /api/resume/:id/file[?download=1] and GET /api/auth/me/profile-image, now called with the bearer header)
-
-Handoff:
-- Backend: nothing new; those two GETs must honor Authorization: Bearer (already in requireAuth) and CORS must allow it.
-- QA on iPhone Safari: avatar shows in navbar + settings (and updates after upload); Manage CVs preview renders (first page only in iOS iframe — known Safari limit) and Download saves with the CV's file name.
-- Note: the avatar fetch goes through apiFetch, so it counts toward the global request loader like any other API call.
+- No backend work.
+- QA: check at 390px that the Jobs "N CVs" badge stays on one row and that a long job title with no spaces wraps in the
+  title column instead of pushing the badge off the card. Also check that long file names and locations still wrap.
 
 STATUS: DONE

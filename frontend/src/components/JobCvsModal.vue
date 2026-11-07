@@ -570,7 +570,7 @@ async function confirmDetach(resume: JobResume) {
             :style="{ animationDelay: cardEnterDelay(index) }"
             @click="selectPreview(resume)"
           >
-            <div class="flex items-start justify-between gap-3">
+            <div class="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-3">
               <div class="flex min-w-0 items-start gap-2">
                 <!-- The rating is one labelled group, not N labelled icons: a screen reader
                      should hear "4 of 5 stars" once, not "star" four times. The icons
@@ -593,7 +593,7 @@ async function confirmDetach(resume: JobResume) {
                   <p class="text-sm text-fg-muted">{{ resume.candidate_email }}</p>
                 </div>
               </div>
-              <span class="list-badge">
+              <span class="list-badge list-badge-text">
                 <FileText class="size-3.5" />
                 {{ resume.file_name }}
               </span>
@@ -602,7 +602,7 @@ async function confirmDetach(resume: JobResume) {
 
             <div v-if="canDetach(resume) && detachingId === resume.id" class="list-confirm" @click.stop>
               <p>This will also delete its match results for this job.</p>
-              <div class="flex gap-2">
+              <div class="flex flex-wrap gap-2">
                 <button
                   type="button"
                   class="btn btn-danger"
@@ -614,7 +614,7 @@ async function confirmDetach(resume: JobResume) {
                 <button type="button" class="btn btn-ghost" @click="cancelDetach">Cancel</button>
               </div>
             </div>
-            <div v-else class="flex gap-2" @click.stop>
+            <div v-else class="flex flex-wrap gap-2" @click.stop>
               <button
                 type="button"
                 class="btn btn-ghost"

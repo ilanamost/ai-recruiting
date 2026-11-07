@@ -49,10 +49,12 @@ describe('mobile safe-area layout (.plan/036)', () => {
     expect(css.match(/\.navbar-actions \{[^}]*\}/)?.[0]).toContain('flex-shrink: 0')
   })
 
-  it('lets list badges wrap on mobile instead of forcing horizontal overflow', () => {
+  // .plan/037 narrowed this from every .list-badge to the user-text modifier, so short badges
+  // (the "3 CVs" count) no longer wrap; tests/mobile-text-wrapping.test.ts covers the rest.
+  it('lets user-text list badges wrap on mobile instead of forcing horizontal overflow', () => {
     const { css } = sass.compile(resolve(srcDir, 'styles/index.scss'))
 
-    expect(css).toMatch(/@media \(max-width: 767px\)\s*\{\s*\.list-badge\s*\{[^}]*white-space: normal/)
+    expect(css).toMatch(/@media \(max-width: 767px\)\s*\{\s*\.list-badge-text\s*\{[^}]*white-space: normal/)
   })
 
   it('<main> uses the page-pad token widened to the side and bottom safe-area insets', () => {

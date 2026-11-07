@@ -230,6 +230,39 @@ describe('JobCvsModal', () => {
     expect(wrapper.text()).toContain('john.pdf')
   })
 
+  // .plan/037: each attached CV's file name badge is user-supplied text, so it opts into the
+  // mobile wrap rule.
+  it('marks each attached CV file name badge as a wrapping text badge', async () => {
+    const wrapper = mountModal()
+    await flushPromises()
+
+    const badges = wrapper.findAll('li .list-badge')
+    expect(badges.map((badge) => badge.text())).toEqual(['jane.pdf', 'john.pdf'])
+    for (const badge of badges) {
+      expect(badge.classes()).toContain('list-badge-text')
+    }
+  })
+
+  // .plan/037 (follow-up): on a phone the badge used to share one row with the candidate name and
+  // got a sliver of width, so a file name split over many lines. The row now stacks below sm.
+  it('stacks the candidate name and file name badge on mobile so the badge gets the full row', async () => {
+    const wrapper = mountModal()
+    await flushPromises()
+
+    const row = wrapper.find('li .list-badge').element.parentElement as HTMLElement
+    expect(row.classList.contains('flex-col')).toBe(true)
+    expect(row.classList.contains('sm:flex-row')).toBe(true)
+  })
+
+  it('renders no file name badge when no CV is attached', async () => {
+    vi.mocked(listJobResumes).mockResolvedValue([])
+    const wrapper = mountModal()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No CVs attached yet')
+    expect(wrapper.findAll('.list-badge')).toHaveLength(0)
+  })
+
   it('only offers unattached CVs in the attach control', async () => {
     const wrapper = mountModal()
     await flushPromises()

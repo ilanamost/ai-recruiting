@@ -317,7 +317,7 @@ async function submitUpload() {
               <span>Email</span>
               <input v-model="editEmail" type="email" />
             </label>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
               <button type="button" class="btn btn-primary" :disabled="savingEdit" @click="saveEdit(resume)">
                 {{ savingEdit ? 'Saving…' : 'Save' }}
               </button>
@@ -326,19 +326,19 @@ async function submitUpload() {
           </template>
 
           <template v-else>
-            <div class="flex items-start justify-between gap-3">
+            <div class="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-3">
               <div class="flex min-w-0 flex-col gap-1 [overflow-wrap:anywhere]">
                 <p class="font-semibold">{{ resume.candidate_name }}</p>
                 <p class="text-sm text-fg-muted">{{ resume.candidate_email }}</p>
               </div>
-              <span class="list-badge">
+              <span class="list-badge list-badge-text">
                 <FileText class="size-3.5" />
                 {{ resume.file_name }}
               </span>
             </div>
 
             <div class="flex flex-wrap items-center gap-1.5">
-              <span v-for="job in resume.jobs" :key="job.id" class="list-badge">
+              <span v-for="job in resume.jobs" :key="job.id" class="list-badge list-badge-text">
                 <Briefcase class="size-3.5" />
                 {{ job.title }}
               </span>
@@ -349,7 +349,7 @@ async function submitUpload() {
 
             <div v-if="canDeleteCv(resume) && deletingId === resume.id" class="list-confirm">
               <p>This will also delete its match results.</p>
-              <div class="flex gap-2">
+              <div class="flex flex-wrap gap-2">
                 <button
                   type="button"
                   class="btn btn-danger"
