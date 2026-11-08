@@ -445,7 +445,7 @@ describe('JobCvsModal', () => {
       clickSpy.mockRestore()
     })
 
-    it('falls back to the TOAST constant on a network failure', async () => {
+    it('toasts the server-unreachable message on a network failure', async () => {
       fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
       const wrapper = mountModal()
       await flushPromises()
@@ -453,7 +453,7 @@ describe('JobCvsModal', () => {
       await downloadButton(wrapper, 'Jane Doe')?.trigger('click')
       await flushPromises()
 
-      expect(toast.error).toHaveBeenCalledWith('Failed to download CV')
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("Can't reach the server"))
     })
   })
 

@@ -43,3 +43,9 @@ export const TOAST = {
   },
   info: {}
 } as const
+
+// Shown when the API cannot be reached at all (server down, offline) - lib/http.ts turns the
+// browser's bare "Failed to fetch" into an ApiError carrying this, so every caller shows it.
+export const SERVER_UNREACHABLE_MESSAGE =
+  "Can't reach the server right now. Check your connection or try again in a moment."
+export const NETWORK_ERROR_CODE = 'network_error'

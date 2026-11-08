@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { UpstreamError } from '../lib/errors'
+import { assertLlmAvailable, isMockMode } from '../lib/llm-mode'
+import { mockScoreMatch } from './mock'
 
 export interface ScoreResult {
   score: number
@@ -39,6 +41,9 @@ function getClient(): Anthropic {
  * user turn. See .doc/architecture.md's "Prompt caching for batch scoring".
  */
 export async function scoreMatch(jobDescription: string, resumeText: string): Promise<ScoreResult> {
+  assertLlmAvailable()
+  if (isMockMode()) return mockScoreMatch(jobDescription, resumeText)
+
   const model = process.env.SCORING_MODEL ?? 'claude-sonnet-5'
 
   const response = await getClient().messages.create({

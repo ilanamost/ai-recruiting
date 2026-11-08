@@ -5,7 +5,8 @@
 // also carry `access_token`/`refresh_token`, which lib/token.ts keeps in localStorage.
 
 import { computed, ref, watch } from 'vue'
-import { apiFetch, parseErrorResponse } from './http'
+import { ApiError, apiFetch, guardNetwork, parseErrorResponse } from './http'
+import { NETWORK_ERROR_CODE } from './toastMessages'
 import { trackRequest } from './loading'
 import { clearTokens, getRefreshToken, takeTokens, withAuthHeader } from './token'
 
@@ -36,6 +37,8 @@ export interface UpdateProfileInput {
 
 const user = ref<AuthUser | null>(null)
 const isLoading = ref(true)
+// True when the initial session check could not reach the API at all (server down / offline).
+const serverUnreachable = ref(false)
 // Bumped on every successful updateProfile. The image endpoint's URL is otherwise derived from
 // the has_profile_image boolean alone, so *replacing* an already-set image produced the identical
 // string before and after — Vue never re-touched the <img src> binding and the browser never
@@ -97,12 +100,12 @@ watch(profileImageUrl, loadProfileImage, { immediate: true })
 // global loader (.plan/035) covers them like every other API call.
 async function login(email: string, password: string): Promise<AuthUser> {
   const response = await trackRequest(() =>
-    fetch(`${API_URL}/api/auth/login`, {
+    guardNetwork(() => fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
-    })
+    }))
   )
   if (!response.ok) {
     return parseErrorResponse(response)
@@ -113,12 +116,12 @@ async function login(email: string, password: string): Promise<AuthUser> {
 
 async function signup(name: string, email: string, password: string, role: 'recruiter' | 'candidate'): Promise<AuthUser> {
   const response = await trackRequest(() =>
-    fetch(`${API_URL}/api/auth/signup`, {
+    guardNetwork(() => fetch(`${API_URL}/api/auth/signup`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, password, role })
-    })
+    }))
   )
   if (!response.ok) {
     return parseErrorResponse(response)
@@ -170,12 +173,19 @@ async function fetchMe(): Promise<AuthUser | null> {
     isLoading.value = true
     try {
       const response = await apiFetch(`${API_URL}/api/auth/me`)
+      serverUnreachable.value = false
       if (!response.ok) {
         user.value = null
         return null
       }
       user.value = await response.json()
       return user.value
+    } catch (error) {
+      // The app must stay up when the API is down: treat it as "not signed in" so the router
+      // guard sends the user to /login, where serverUnreachable explains what happened.
+      user.value = null
+      serverUnreachable.value = error instanceof ApiError && error.code === NETWORK_ERROR_CODE
+      return null
     } finally {
       isLoading.value = false
     }
@@ -222,5 +232,5 @@ async function updateProfile(input: UpdateProfileInput): Promise<AuthUser> {
 }
 
 export function useAuth() {
-  return { user, isLoading, profileImageUrl, profileImageSrc, login, signup, logout, fetchMe, updateProfile }
+  return { user, isLoading, serverUnreachable, profileImageUrl, profileImageSrc, login, signup, logout, fetchMe, updateProfile }
 }

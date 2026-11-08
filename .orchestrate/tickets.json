@@ -1,4 +1,6 @@
 {
-  "frontend": { "id": "AI-114", "url": "https://linear.app/ai-dev-agents/issue/AI-114/fe-keep-short-badges-on-one-row-on-mobile" },
-  "qa": { "id": "AI-115", "url": "https://linear.app/ai-dev-agents/issue/AI-115/qa-mobile-text-wrapping" }
+  "plan": ".plan/038-2026-11-08-llm-mode-mock.md",
+  "frontend": null,
+  "backend": { "id": "AI-125", "url": "https://linear.app/ai-dev-agents/issue/AI-125/be-llm-modemock-for-analysis-and-scoring-stackfull" },
+  "qa": { "id": "AI-126", "url": "https://linear.app/ai-dev-agents/issue/AI-126/qa-llm-modemock-validation" }
 }

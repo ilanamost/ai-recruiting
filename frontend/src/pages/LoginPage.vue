@@ -5,10 +5,10 @@ import { toast } from 'vue-sonner'
 import { ChevronDown, Eye, EyeOff } from '@lucide/vue'
 import { ApiError } from '../lib/http'
 import { useAuth } from '../lib/auth'
-import { TOAST } from '../lib/toastMessages'
+import { SERVER_UNREACHABLE_MESSAGE, TOAST } from '../lib/toastMessages'
 
 const router = useRouter()
-const { login, signup } = useAuth()
+const { login, signup, serverUnreachable } = useAuth()
 
 const mode = ref<'login' | 'signup'>('login')
 
@@ -74,6 +74,10 @@ async function onSubmit() {
         {{ mode === 'login' ? 'Welcome back to AI Recruiting.' : 'Get started with AI Recruiting.' }}
       </p>
     </div>
+
+    <p v-if="serverUnreachable" class="card text-sm text-danger" role="alert">
+      {{ SERVER_UNREACHABLE_MESSAGE }}
+    </p>
 
     <form class="card flex flex-col gap-4" novalidate @submit.prevent="onSubmit">
       <label v-if="mode === 'signup'">

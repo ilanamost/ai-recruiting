@@ -6,6 +6,7 @@ export interface ErrorCodes {
   readonly VALIDATION_ERROR: 'validation_error'
   readonly NOT_FOUND: 'not_found'
   readonly UPSTREAM_ERROR: 'upstream_error'
+  readonly SERVICE_UNAVAILABLE: 'service_unavailable'
   readonly CONFLICT: 'conflict'
   readonly UNAUTHENTICATED: 'unauthenticated'
   readonly FORBIDDEN: 'forbidden'
@@ -16,6 +17,7 @@ export const ErrorCodes: ErrorCodes = {
   VALIDATION_ERROR: 'validation_error',
   NOT_FOUND: 'not_found',
   UPSTREAM_ERROR: 'upstream_error',
+  SERVICE_UNAVAILABLE: 'service_unavailable',
   CONFLICT: 'conflict',
   UNAUTHENTICATED: 'unauthenticated',
   FORBIDDEN: 'forbidden',
@@ -62,6 +64,14 @@ export class UpstreamError extends AppError {
   constructor(message: string) {
     super(ErrorCodes.UPSTREAM_ERROR, message, 502)
     this.name = 'UpstreamError'
+  }
+}
+
+/** A feature is switched off or misconfigured on this server - the rest of the API stays usable. */
+export class ServiceUnavailableError extends AppError {
+  constructor(message: string) {
+    super(ErrorCodes.SERVICE_UNAVAILABLE, message, 503)
+    this.name = 'ServiceUnavailableError'
   }
 }
 
