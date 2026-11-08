@@ -620,6 +620,26 @@ describe('JobCvsModal', () => {
     expect(getMatch).not.toHaveBeenCalled()
   })
 
+  it('treats "no match yet" as a normal state: scores next, no toast, no console error or warning', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.mocked(toast.error).mockClear()
+    vi.mocked(getMatchForPair).mockResolvedValue(null)
+    const wrapper = mountModal()
+    await flushPromises()
+
+    await wrapper.findAll('li').find((li) => li.text().includes('Jane Doe'))?.trigger('click')
+    await flushPromises()
+
+    expect(getMatchForPair).toHaveBeenCalledWith('job-1', 'resume-1')
+    expect(createMatch).toHaveBeenCalledWith({ resume_id: 'resume-1', job_id: 'job-1' })
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(errorSpy).not.toHaveBeenCalled()
+    expect(warnSpy).not.toHaveBeenCalled()
+    errorSpy.mockRestore()
+    warnSpy.mockRestore()
+  })
+
   it('closes the preview via the preview dialog close button, keeping the parent dialog open', async () => {
     const wrapper = mountModal()
     await flushPromises()

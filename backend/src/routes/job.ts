@@ -256,7 +256,10 @@ export function createJobRouter(store: Store): Router {
 
       const match = await store.getLatestMatchForPair(jobId, resumeId)
       if (!match) {
-        throw new NotFoundError('No match found for this job and resume')
+        // "No match yet" is a normal state, not an error (.plan/041): 204 keeps the
+        // browser console clean. Unknown job/resume and unattached pairs still 404.
+        res.status(204).end()
+        return
       }
 
       res.json(match)

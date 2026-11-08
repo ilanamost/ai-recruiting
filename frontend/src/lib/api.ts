@@ -238,9 +238,13 @@ export async function getMatch(id: string): Promise<Match> {
   return response.json()
 }
 
+// "No match yet" for an attached pair is a normal state, not an error: the result is `null`
+// and the caller scores the pair. The server answers it with `204 No Content` (no body, so no
+// browser console line). A `404` is also read as "no match" during the rollout, while an older
+// backend still answers that way; do not call `response.json()` on the 204.
 export async function getMatchForPair(jobId: string, resumeId: string): Promise<Match | null> {
   const response = await apiFetch(`${API_URL}/api/job/${jobId}/resumes/${resumeId}/match`)
-  if (response.status === 404) {
+  if (response.status === 204 || response.status === 404) {
     return null
   }
   if (!response.ok) {

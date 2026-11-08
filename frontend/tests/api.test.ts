@@ -5,6 +5,7 @@ import {
   detachResumeFromJob,
   duplicateJob,
   fetchResumeFileBlob,
+  getMatchForPair,
   getResumeFileUrl,
   listJobResumes,
   listJobs,
@@ -31,6 +32,42 @@ describe('lib/api — job/CV attach, duplicate, file endpoints', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  describe('getMatchForPair', () => {
+    const url = 'http://localhost:3001/api/job/job-1/resumes/resume-1/match'
+
+    it('resolves null on 204 without reading a body', async () => {
+      const json = vi.fn().mockRejectedValue(new SyntaxError('Unexpected end of JSON input'))
+      fetchMock.mockResolvedValue({ ok: true, status: 204, json } as unknown as Response)
+
+      await expect(getMatchForPair('job-1', 'resume-1')).resolves.toBeNull()
+      expect(fetchMock.mock.calls[0][0]).toBe(url)
+      expect(json).not.toHaveBeenCalled()
+    })
+
+    it('resolves null on 404 (rollout tolerance)', async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({ error: { code: 'not_found', message: 'No match found' } }, { ok: false, status: 404 })
+      )
+
+      await expect(getMatchForPair('job-1', 'resume-1')).resolves.toBeNull()
+    })
+
+    it('returns the match on 200', async () => {
+      const match = { id: 'match-1', score: 82 }
+      fetchMock.mockResolvedValue(jsonResponse(match))
+
+      await expect(getMatchForPair('job-1', 'resume-1')).resolves.toEqual(match)
+    })
+
+    it('rejects with an ApiError on 500', async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({ error: { code: 'internal_error', message: 'Boom' } }, { ok: false, status: 500 })
+      )
+
+      await expect(getMatchForPair('job-1', 'resume-1')).rejects.toThrow(ApiError)
+    })
   })
 
   it('duplicateJob POSTs to /api/job/:id/duplicate and returns the new job', async () => {

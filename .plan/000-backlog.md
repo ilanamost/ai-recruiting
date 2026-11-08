@@ -2,10 +2,7 @@
 
 Current queue:
 
-- [V] When the user is logged out, he shouldn't be able to see buttons that are inactive. He shouldn't be able to see the different application routes in the navbar, except 'AI Recruiting' - that should be visible, but not clickable. He shouldn't be able to see the gear icon with the 'user settings' and 'logout' options. The placeholder and the light/dark switch can remain. The gear icon can either be removed or remain but be unclickable. | plan:.plan/040-2026-11-08-logged-out-navbar.md
-
-- [] Job matches issue: when I click on a resume in manage cvs, there are 2 match calls, one looks for an existing match, and the other calculates a new one. The behaviour is correct, however if there is no existing match, an error is returned and thrown in a console. I don't think it is even an error, a match wasn't created yet and it is a logical behaviour of the application. Make it a seperate state, not an error, and do not display an error message in the console.
-
+(empty)
 
 ## DONE
 
@@ -72,3 +69,7 @@ What should I do next? | plan:.plan/017-2026-08-10-home-page.md
 
 - [V] When the application loads, on the login and Signup pages, a password appeares in the password field.
 Password field should be empty untill the user has entered credentials. It shouldn't be filled after refresh and logout either. | plan:.plan/039-2026-11-08-login-password-field-empty.md
+
+- [V] When the user is logged out, he shouldn't be able to see buttons that are inactive. He shouldn't be able to see the different application routes in the navbar, except 'AI Recruiting' - that should be visible, but not clickable. He shouldn't be able to see the gear icon with the 'user settings' and 'logout' options. The placeholder and the light/dark switch can remain. The gear icon can either be removed or remain but be unclickable. | plan:.plan/040-2026-11-08-logged-out-navbar.md
+
+- [V] Job matches issue: when I click on a resume in manage cvs, there are 2 match calls, one looks for an existing match, and the other calculates a new one. The behaviour is correct, however if there is no existing match, an error is returned and thrown in a console. I don't think it is even an error, a match wasn't created yet and it is a logical behaviour of the application. Make it a seperate state, not an error, and do not display an error message in the console. | stack:full | plan:.plan/041-2026-11-08-no-existing-match-state.md
