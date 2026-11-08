@@ -335,6 +335,8 @@ async function loadPreviewExtras(resume: JobResume) {
         .getMatchForPair(props.job.id, resume.id)
         .then((match) => {
           if (stillCurrent()) {
+            // `null` means "no match yet": a normal state, not an error. Leaving the id
+            // undefined lets MatchResult score the pair; nothing is logged or toasted.
             previewMatchId.value = match?.id
           }
         })

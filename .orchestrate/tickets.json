@@ -1,6 +1,6 @@
 {
-  "plan": ".plan/040-2026-11-08-logged-out-navbar.md",
-  "frontend": { "id": "AI-134", "url": "https://linear.app/ai-dev-agents/issue/AI-134/fe-minimal-navbar-when-logged-out" },
-  "backend": null,
-  "qa": { "id": "AI-135", "url": "https://linear.app/ai-dev-agents/issue/AI-135/qa-minimal-navbar-when-logged-out-validation" }
+  "plan": ".plan/041-2026-11-08-no-existing-match-state.md",
+  "frontend": { "id": "AI-138", "url": "https://linear.app/ai-dev-agents/issue/AI-138/fe-no-match-yet-is-a-state-not-an-error" },
+  "backend": { "id": "AI-139", "url": "https://linear.app/ai-dev-agents/issue/AI-139/be-match-lookup-answers-204-when-no-match-exists-stackfull" },
+  "qa": { "id": "AI-140", "url": "https://linear.app/ai-dev-agents/issue/AI-140/qa-no-match-yet-state-validation" }
 }

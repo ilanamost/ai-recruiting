@@ -8,7 +8,7 @@ import { createAuthedUser } from './helpers/auth'
 async function attachedResume(
   store: Store,
   jobId: string,
-  overrides: Partial<{ name: string; email: string }> = {}
+  overrides: Partial<{ name: string; email: string; owner_user_id: string }> = {}
 ) {
   const candidate = await store.createCandidate({
     name: overrides.name ?? 'Jane Doe',
@@ -20,7 +20,8 @@ async function attachedResume(
     file_name: 'resume.pdf',
     mime_type: 'application/pdf',
     content: 'resume text',
-    file_data: Buffer.from('%PDF-1.4 fake bytes')
+    file_data: Buffer.from('%PDF-1.4 fake bytes'),
+    owner_user_id: overrides.owner_user_id ?? null
   })
   return resume
 }
@@ -83,12 +84,46 @@ describe('GET /api/job/:jobId/resumes/:resumeId/match', () => {
     expect(response.body.error.code).toBe('not_found')
   })
 
-  it('returns 404 when the pair is attached but no match exists yet', async () => {
+  it('returns 204 with an empty body when the pair is attached but no match exists yet', async () => {
     const { store, app, cookie } = await setup()
     const job = await store.createJob({ org_id: 'demo-org', title: 'Backend Engineer', description: 'Node' })
     const resume = await attachedResume(store, job.id)
 
     const response = await request(app).get(`/api/job/${job.id}/resumes/${resume.id}/match`).set('Cookie', cookie)
+
+    expect(response.status).toBe(204)
+    expect(response.text).toBe('')
+    expect(response.body).toEqual({})
+  })
+
+  it('returns 204 for a candidate asking about their own resume with no match yet', async () => {
+    const { store, app } = await setup()
+    const { cookie, user } = await createAuthedUser(store, 'candidate')
+    const job = await store.createJob({ org_id: 'demo-org', title: 'Backend Engineer', description: 'Node' })
+    const resume = await attachedResume(store, job.id, { owner_user_id: user.id })
+
+    const response = await request(app).get(`/api/job/${job.id}/resumes/${resume.id}/match`).set('Cookie', cookie)
+
+    expect(response.status).toBe(204)
+  })
+
+  it("returns 403 for a candidate asking about another candidate's resume with no match yet", async () => {
+    const { store, app } = await setup()
+    const { cookie } = await createAuthedUser(store, 'candidate')
+    const job = await store.createJob({ org_id: 'demo-org', title: 'Backend Engineer', description: 'Node' })
+    const resume = await attachedResume(store, job.id)
+
+    const response = await request(app).get(`/api/job/${job.id}/resumes/${resume.id}/match`).set('Cookie', cookie)
+
+    expect(response.status).toBe(403)
+    expect(response.body.error.code).toBe('forbidden')
+  })
+
+  it('returns 404 for an unknown resume on a known job', async () => {
+    const { store, app, cookie } = await setup()
+    const job = await store.createJob({ org_id: 'demo-org', title: 'Backend Engineer', description: 'Node' })
+
+    const response = await request(app).get(`/api/job/${job.id}/resumes/unknown-resume/match`).set('Cookie', cookie)
 
     expect(response.status).toBe(404)
     expect(response.body.error.code).toBe('not_found')
