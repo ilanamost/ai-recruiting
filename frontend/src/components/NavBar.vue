@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Briefcase, List, LogOut, Menu, Moon, Settings, Sparkles, Sun, User, UserCog, Users, X } from '@lucide/vue'
 import { useTheme } from '../lib/theme'
@@ -12,8 +12,19 @@ const { theme, toggleTheme } = useTheme()
 // header, so the avatar also loads on iOS Safari. Null while loading or on failure → User icon.
 const { user, profileImageSrc, logout } = useAuth()
 
+// .plan/040: signed out shows only the brand (static), theme toggle and avatar placeholder.
+const isSignedIn = computed(() => !!user.value)
+
 const menuOpen = ref(false)
 const mobileMenuOpen = ref(false)
+
+// Drop any open menu on logout so it does not reappear already open after the next login.
+watch(isSignedIn, (signedIn) => {
+  if (!signedIn) {
+    menuOpen.value = false
+    mobileMenuOpen.value = false
+  }
+})
 
 function toggleMenu() {
   menuOpen.value = !menuOpen.value
@@ -48,6 +59,7 @@ async function onLogout() {
     <!-- A RouterLink again (.plan/017), reversing .plan/014: "/" is now the home page — a real
          destination for every role — so the pointer cursor is honest here. -->
     <RouterLink
+      v-if="isSignedIn"
       to="/"
       class="navbar-brand"
       :class="{ 'is-active': route.name === 'home' }"
@@ -58,8 +70,14 @@ async function onLogout() {
            without touching the icon beside it. -->
       <span class="navbar-brand-text">AI Recruiting</span>
     </RouterLink>
+    <!-- .plan/040: signed out the brand is plain, non-interactive text (no link, not focusable). -->
+    <div v-else class="navbar-brand is-static">
+      <Sparkles class="size-4" />
+      <span class="navbar-brand-text">AI Recruiting</span>
+    </div>
 
     <button
+      v-if="isSignedIn"
       type="button"
       class="navbar-hamburger"
       :aria-expanded="mobileMenuOpen"
@@ -75,11 +93,11 @@ async function onLogout() {
          the navbar's own strip instead of the full viewport — clicking actual page content
          would never have closed this menu. z-10 keeps it below .navbar's z-20 stacking context
          (and everything inside it, including the open panel) once it's a body-level sibling. -->
-    <Teleport to="body">
+    <Teleport v-if="isSignedIn" to="body">
       <div v-if="mobileMenuOpen" class="navbar-mobile-overlay fixed inset-0 z-10" @click="closeMobileMenu" />
     </Teleport>
 
-    <div class="navbar-links" :class="{ 'is-open': mobileMenuOpen }">
+    <div v-if="isSignedIn" class="navbar-links" :class="{ 'is-open': mobileMenuOpen }">
       <RouterLink
         v-if="user?.role !== 'candidate'"
         to="/jobs/new"
@@ -127,7 +145,7 @@ async function onLogout() {
         <User v-else class="size-4" />
       </span>
 
-      <div class="relative">
+      <div v-if="isSignedIn" class="relative">
         <button type="button" class="theme-toggle" aria-label="Settings" @click="toggleMenu">
           <Settings class="size-4" />
         </button>

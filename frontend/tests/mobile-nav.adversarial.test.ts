@@ -188,18 +188,15 @@ describe('mobile nav — adversarial', () => {
   })
 
   describe('degenerate and structural cases', () => {
-    // Logged-out / not-yet-hydrated user. `user?.role !== 'candidate'` is true when user is
-    // null, so the links render — the point here is that the toggle does not throw.
-    it('renders and toggles without a user', async () => {
+    // Logged-out / not-yet-hydrated user. .plan/040: signed out there is nothing to open, so
+    // the hamburger, links container and overlay are not rendered — and rendering must not throw.
+    it('renders without a hamburger or menu when there is no user', async () => {
       mockUser.value = null
       const { wrapper } = await mountNav('/')
 
-      expect(wrapper.find('.navbar-hamburger').exists()).toBe(true)
-      await wrapper.find('.navbar-hamburger').trigger('click')
-      expect(openState(wrapper)).toEqual(OPEN)
-      await bodyOverlay('.navbar-mobile-overlay')?.trigger('click')
-      await flushPromises()
-      expect(openState(wrapper)).toEqual(CLOSED)
+      expect(wrapper.find('.navbar-hamburger').exists()).toBe(false)
+      expect(wrapper.find('.navbar-links').exists()).toBe(false)
+      expect(bodyOverlay('.navbar-mobile-overlay')).toBeNull()
     })
 
     // Regression guard for the QA-reported containing-block bug: a position:fixed overlay
