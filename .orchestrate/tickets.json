@@ -1,6 +1,6 @@
 {
-  "plan": ".plan/039-2026-11-08-login-password-field-empty.md",
-  "frontend": { "id": "AI-132", "url": "https://linear.app/ai-dev-agents/issue/AI-132/fe-empty-password-field-on-loginsignup-load-refresh-logout" },
+  "plan": ".plan/040-2026-11-08-logged-out-navbar.md",
+  "frontend": { "id": "AI-134", "url": "https://linear.app/ai-dev-agents/issue/AI-134/fe-minimal-navbar-when-logged-out" },
   "backend": null,
-  "qa": { "id": "AI-133", "url": "https://linear.app/ai-dev-agents/issue/AI-133/qa-empty-password-field-on-loginsignup-validation" }
+  "qa": { "id": "AI-135", "url": "https://linear.app/ai-dev-agents/issue/AI-135/qa-minimal-navbar-when-logged-out-validation" }
 }
