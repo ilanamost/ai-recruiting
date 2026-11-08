@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { ChevronDown, Eye, EyeOff } from '@lucide/vue'
@@ -17,12 +17,34 @@ const email = ref('')
 const password = ref('')
 const role = ref<'' | 'recruiter' | 'candidate'>('')
 const showPassword = ref(false)
+const passwordInput = ref<HTMLInputElement | null>(null)
 
 const submitting = ref(false)
 const submitted = ref(false)
 const errorMessage = ref('')
 
+// Browsers may autofill the DOM value without touching the Vue state, so clear both.
+function resetCredentials() {
+  password.value = ''
+  showPassword.value = false
+  if (passwordInput.value) passwordInput.value.value = ''
+}
+
+function onPageShow(event: PageTransitionEvent) {
+  if (event.persisted) resetCredentials()
+}
+
+onMounted(() => {
+  resetCredentials()
+  window.addEventListener('pageshow', onPageShow)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('pageshow', onPageShow)
+})
+
 function switchMode(next: 'login' | 'signup') {
+  resetCredentials()
   mode.value = next
   errorMessage.value = ''
   submitted.value = false
@@ -106,7 +128,9 @@ async function onSubmit() {
         <span>Password *</span>
         <div class="password-input-wrap">
           <input
+            ref="passwordInput"
             v-model="password"
+            autocomplete="new-password"
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
             :class="{ 'input-invalid': submitted && passwordError }"

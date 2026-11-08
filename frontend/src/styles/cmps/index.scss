@@ -1,8 +1,8 @@
-@import './card.scss';
-@import './navbar.scss';
-@import './toast.scss';
-@import './dropzone.scss';
-@import './score-bar.scss';
-@import './list.scss';
-@import './avatar.scss';
-@import './loader.scss';
+@use './card';
+@use './navbar';
+@use './toast';
+@use './dropzone';
+@use './score-bar';
+@use './list';
+@use './avatar';
+@use './loader';

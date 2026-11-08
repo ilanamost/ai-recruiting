@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ApiError } from '../src/lib/http'
 
@@ -6,14 +7,26 @@ const mockLogin = vi.fn()
 const mockSignup = vi.fn()
 const mockPush = vi.fn()
 
+const mockLogout = vi.fn()
+const mockUser = ref<Record<string, unknown> | null>(null)
+const mockProfileImageSrc = ref<string | null>(null)
+
 const mockServerUnreachable = { value: false }
 
 vi.mock('../src/lib/auth', () => ({
-  useAuth: () => ({ login: mockLogin, signup: mockSignup, serverUnreachable: mockServerUnreachable })
+  useAuth: () => ({
+    login: mockLogin,
+    signup: mockSignup,
+    logout: mockLogout,
+    user: mockUser,
+    profileImageSrc: mockProfileImageSrc,
+    serverUnreachable: mockServerUnreachable
+  })
 }))
 
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: mockPush })
+  useRouter: () => ({ push: mockPush }),
+  useRoute: () => ({ name: 'login', path: '/login' })
 }))
 
 vi.mock('vue-sonner', () => ({
@@ -21,6 +34,7 @@ vi.mock('vue-sonner', () => ({
 }))
 
 import LoginPage from '../src/pages/LoginPage.vue'
+import NavBar from '../src/components/NavBar.vue'
 
 async function switchToSignup(wrapper: ReturnType<typeof mount>) {
   const switchButton = wrapper.findAll('button').find((btn) => btn.text().includes('Sign up'))
@@ -32,7 +46,13 @@ describe('LoginPage', () => {
     mockLogin.mockReset()
     mockSignup.mockReset()
     mockPush.mockReset()
+    mockLogout.mockReset()
+    mockUser.value = null
     mockServerUnreachable.value = false
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
   })
 
   it('shows a server-unreachable notice instead of crashing when the API is down', () => {
@@ -176,5 +196,167 @@ describe('LoginPage', () => {
 
     expect(mockSignup).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Password must be at least 8 characters')
+  })
+
+  describe('empty password field (.plan/039)', () => {
+    const passwordSelector = 'input[placeholder="••••••••"]'
+
+    function passwordEl(wrapper: ReturnType<typeof mount>) {
+      return wrapper.find(passwordSelector).element as HTMLInputElement
+    }
+
+    function firePageShow(persisted: boolean) {
+      const event = new Event('pageshow')
+      Object.defineProperty(event, 'persisted', { value: persisted })
+      window.dispatchEvent(event)
+    }
+
+    // Simulates browser autofill: the first time the password input's DOM value is set to ''
+    // (Vue's v-model initialisation), the "browser" fills in a saved password right after.
+    function simulateAutofillOnce() {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!
+      let filled = false
+      Object.defineProperty(HTMLInputElement.prototype, 'value', {
+        configurable: true,
+        get: descriptor.get,
+        set(this: HTMLInputElement, value: string) {
+          descriptor.set!.call(this, value)
+          if (!filled && value === '' && this.placeholder === '••••••••') {
+            filled = true
+            descriptor.set!.call(this, 'saved-password')
+          }
+        }
+      })
+      return () => {
+        Object.defineProperty(HTMLInputElement.prototype, 'value', descriptor)
+      }
+    }
+
+    it('sets autocomplete="new-password" on the password input in login and signup modes', async () => {
+      const wrapper = mount(LoginPage)
+      expect(wrapper.find(passwordSelector).attributes('autocomplete')).toBe('new-password')
+
+      await switchToSignup(wrapper)
+      expect(wrapper.find(passwordSelector).attributes('autocomplete')).toBe('new-password')
+    })
+
+    it('has an empty password on mount in both modes', async () => {
+      const wrapper = mount(LoginPage)
+      expect(passwordEl(wrapper).value).toBe('')
+
+      await switchToSignup(wrapper)
+      expect(passwordEl(wrapper).value).toBe('')
+    })
+
+    it('clears a password the browser autofilled into the DOM at mount', () => {
+      const restore = simulateAutofillOnce()
+      try {
+        const wrapper = mount(LoginPage)
+        expect(passwordEl(wrapper).value).toBe('')
+      } finally {
+        restore()
+      }
+    })
+
+    it('clears a typed password and hides it again when switching between login and signup', async () => {
+      const wrapper = mount(LoginPage)
+      await wrapper.find(passwordSelector).setValue('secret123')
+      await wrapper.find('.password-toggle').trigger('click')
+      expect(wrapper.find(passwordSelector).attributes('type')).toBe('text')
+
+      await switchToSignup(wrapper)
+      expect(passwordEl(wrapper).value).toBe('')
+      expect(wrapper.find(passwordSelector).attributes('type')).toBe('password')
+
+      await wrapper.find(passwordSelector).setValue('another123')
+      const backButton = wrapper.findAll('button').find((btn) => btn.text() === 'Log in' && btn.attributes('type') === 'button')
+      await backButton?.trigger('click')
+      expect(passwordEl(wrapper).value).toBe('')
+    })
+
+    it('clears the password on pageshow with persisted=true but leaves it on persisted=false', async () => {
+      const wrapper = mount(LoginPage)
+      await wrapper.find(passwordSelector).setValue('typed-by-user')
+
+      firePageShow(false)
+      await wrapper.vm.$nextTick()
+      expect(passwordEl(wrapper).value).toBe('typed-by-user')
+
+      passwordEl(wrapper).value = 'autofilled-from-bfcache'
+      firePageShow(true)
+      await wrapper.vm.$nextTick()
+      expect(passwordEl(wrapper).value).toBe('')
+
+      // state is cleared too: submitting now reports the missing password
+      await wrapper.find('input[type=email]').setValue('rita@example.com')
+      await wrapper.find('form').trigger('submit')
+      expect(mockLogin).not.toHaveBeenCalled()
+      expect(wrapper.text()).toContain('Password is required')
+    })
+
+    it('removes the pageshow listener on unmount', () => {
+      const add = vi.spyOn(window, 'addEventListener')
+      const remove = vi.spyOn(window, 'removeEventListener')
+      const wrapper = mount(LoginPage)
+      const handler = add.mock.calls.find(([type]) => type === 'pageshow')?.[1]
+      expect(handler).toBeTypeOf('function')
+
+      wrapper.unmount()
+      expect(remove).toHaveBeenCalledWith('pageshow', handler)
+      add.mockRestore()
+      remove.mockRestore()
+    })
+
+    it('shows an empty password field on the login page after logging out', async () => {
+      mockUser.value = { id: 'u1', name: 'Rita', email: 'rita@example.com', role: 'recruiter', org_id: 'o', has_profile_image: false }
+      mockLogout.mockResolvedValue(undefined)
+      const navBar = mount(NavBar, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+
+      await navBar.find('button[aria-label="Settings"]').trigger('click')
+      await navBar.findAll('button').find((btn) => btn.text().includes('Logout'))?.trigger('click')
+      await flushPromises()
+
+      expect(mockLogout).toHaveBeenCalled()
+      expect(mockPush).toHaveBeenCalledWith('/login')
+
+      const restore = simulateAutofillOnce()
+      try {
+        const loginPage = mount(LoginPage)
+        expect(passwordEl(loginPage).value).toBe('')
+        expect(loginPage.find(passwordSelector).attributes('autocomplete')).toBe('new-password')
+      } finally {
+        restore()
+      }
+    })
+
+    it('does not carry the previous password into the field across login, logout and login again', async () => {
+      mockLogin.mockResolvedValue({ id: 'u1', role: 'recruiter' })
+      const first = mount(LoginPage)
+      await first.find('input[type=email]').setValue('rita@example.com')
+      await first.find(passwordSelector).setValue('secret123')
+      await first.find('form').trigger('submit')
+      await flushPromises()
+      expect(mockLogin).toHaveBeenCalledWith('rita@example.com', 'secret123')
+      first.unmount()
+
+      const second = mount(LoginPage)
+      expect(passwordEl(second).value).toBe('')
+      await second.find('form').trigger('submit')
+      expect(mockLogin).toHaveBeenCalledTimes(1)
+      expect(second.text()).toContain('Password is required')
+    })
+
+    it('keeps the entered email after a failed login', async () => {
+      mockLogin.mockRejectedValue(new ApiError('unauthorized', 'Invalid email or password'))
+      const wrapper = mount(LoginPage)
+
+      await wrapper.find('input[type=email]').setValue('rita@example.com')
+      await wrapper.find(passwordSelector).setValue('wrong')
+      await wrapper.find('form').trigger('submit')
+      await flushPromises()
+
+      expect((wrapper.find('input[type=email]').element as HTMLInputElement).value).toBe('rita@example.com')
+      expect(wrapper.text()).toContain('Invalid email or password')
+    })
   })
 })

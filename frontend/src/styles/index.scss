@@ -5,6 +5,6 @@
    Vite as its own .scss module (outside the Tailwind entry) is what guarantees Sass compiles
    it. Loads after main.css so the cascade order (tailwind -> vue-sonner -> setup -> basics ->
    cmps) is unchanged. */
-@import './setup/index.scss';
-@import './basics/index.scss';
-@import './cmps/index.scss';
+@use './setup';
+@use './basics';
+@use './cmps';
