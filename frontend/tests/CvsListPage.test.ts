@@ -119,6 +119,29 @@ describe('CvsListPage', () => {
     expect(wrapper.text()).toContain('Backend Engineer')
   })
 
+  // .plan/037: the file name and job-title badges hold user-supplied text, so they opt into the
+  // mobile wrap rule; a CV with no job shows plain text, never an empty wrapping badge.
+  it('marks the file name and job title badges as wrapping text badges', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const badges = wrapper.findAll('li .list-badge')
+    expect(badges.map((badge) => badge.text())).toEqual(['jane.pdf', 'Backend Engineer'])
+    for (const badge of badges) {
+      expect(badge.classes()).toContain('list-badge-text')
+    }
+  })
+
+  it('renders only the file name badge for a CV not attached to any job', async () => {
+    vi.mocked(listResumes).mockResolvedValue(pageOf([{ ...resumes[0], jobs: [] }]))
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const badges = wrapper.findAll('li .list-badge-text')
+    expect(badges.map((badge) => badge.text())).toEqual(['jane.pdf'])
+    expect(wrapper.text()).toContain('Not attached to any job')
+  })
+
   it('shows a not-attached label for a CV with no jobs', async () => {
     vi.mocked(listResumes).mockResolvedValue(pageOf([{ ...resumes[0], jobs: [] }]))
     const wrapper = mountPage()

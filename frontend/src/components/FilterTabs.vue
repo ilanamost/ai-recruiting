@@ -69,7 +69,7 @@ function onKeydown(event: KeyboardEvent, index: number) {
 
 <template>
   <div
-    class="inline-flex items-center gap-1 rounded-md border border-border bg-surface p-1"
+    class="inline-flex flex-wrap items-center gap-1 rounded-md border border-border bg-surface p-1"
     role="tablist"
     :aria-label="label"
   >
@@ -81,7 +81,7 @@ function onKeydown(event: KeyboardEvent, index: number) {
       role="tab"
       :aria-selected="option.value === modelValue"
       :tabindex="option.value === modelValue ? 0 : -1"
-      class="rounded-md px-3 py-1 text-sm font-medium transition-colors"
+      class="rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors"
       :class="
         option.value === modelValue
           ? 'bg-primary text-primary-fg'

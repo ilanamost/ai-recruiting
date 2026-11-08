@@ -154,6 +154,9 @@ input:focus-visible {
   padding: 0.625rem 1.125rem;
   font-size: 0.875rem;
   font-weight: 600;
+  // .plan/037: button labels are short fixed text ("Manage CVs", "Clear filters"); they move to
+  // a new row via the parent's flex-wrap instead of splitting across two lines.
+  white-space: nowrap;
   transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.1s ease;
 
   &:active {
