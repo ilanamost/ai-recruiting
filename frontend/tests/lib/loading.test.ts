@@ -66,7 +66,7 @@ describe('lib/loading — request tracking through apiFetch', () => {
     expect(pendingCount.value).toBe(1)
 
     response.reject(new TypeError('Failed to fetch'))
-    await expect(call).rejects.toThrow('Failed to fetch')
+    await expect(call).rejects.toThrow("Can't reach the server")
 
     expect(pendingCount.value).toBe(0)
     expect(isLoading.value).toBe(false)

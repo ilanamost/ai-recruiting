@@ -6,8 +6,10 @@ const mockLogin = vi.fn()
 const mockSignup = vi.fn()
 const mockPush = vi.fn()
 
+const mockServerUnreachable = { value: false }
+
 vi.mock('../src/lib/auth', () => ({
-  useAuth: () => ({ login: mockLogin, signup: mockSignup })
+  useAuth: () => ({ login: mockLogin, signup: mockSignup, serverUnreachable: mockServerUnreachable })
 }))
 
 vi.mock('vue-router', () => ({
@@ -30,6 +32,15 @@ describe('LoginPage', () => {
     mockLogin.mockReset()
     mockSignup.mockReset()
     mockPush.mockReset()
+    mockServerUnreachable.value = false
+  })
+
+  it('shows a server-unreachable notice instead of crashing when the API is down', () => {
+    mockServerUnreachable.value = true
+    const wrapper = mount(LoginPage)
+
+    expect(wrapper.find('[role=alert]').text()).toContain("Can't reach the server")
+    expect(wrapper.find('form').exists()).toBe(true)
   })
 
   it('logs in with email and password and redirects to /', async () => {

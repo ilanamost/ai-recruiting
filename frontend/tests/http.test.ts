@@ -22,6 +22,16 @@ describe('lib/http — apiFetch', () => {
     vi.unstubAllGlobals()
   })
 
+  it('turns an unreachable server (fetch TypeError) into an ApiError instead of crashing the caller', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    await expect(apiFetch('http://localhost:3001/api/job')).rejects.toMatchObject({
+      name: 'ApiError',
+      code: 'network_error',
+      message: expect.stringContaining("Can't reach the server")
+    })
+  })
+
   it('always sends credentials: include', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ ok: true }))
 

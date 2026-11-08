@@ -10,6 +10,7 @@
 
 import { trackRequest } from './loading'
 import { clearTokens, getRefreshToken, takeTokens, withAuthHeader } from './token'
+import { NETWORK_ERROR_CODE, SERVER_UNREACHABLE_MESSAGE } from './toastMessages'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
@@ -22,6 +23,20 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.code = code
     this.details = details
+  }
+}
+
+// fetch() rejects with a bare TypeError when the server is unreachable (connection refused,
+// offline, CORS-blocked). Callers only handle ApiError, so translate it here instead of letting
+// it escape as an unhandled "Failed to fetch".
+export async function guardNetwork<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new ApiError(NETWORK_ERROR_CODE, SERVER_UNREACHABLE_MESSAGE)
+    }
+    throw error
   }
 }
 
@@ -91,17 +106,19 @@ function authorizedInit(options: RequestInit): RequestInit {
 }
 
 export function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  return trackRequest(async () => {
-    const response = await fetch(url, authorizedInit(options))
-    if (response.status !== 401) {
-      return response
-    }
+  return trackRequest(() =>
+    guardNetwork(async () => {
+      const response = await fetch(url, authorizedInit(options))
+      if (response.status !== 401) {
+        return response
+      }
 
-    const refreshed = await refreshAccessToken()
-    if (!refreshed) {
-      return response
-    }
+      const refreshed = await refreshAccessToken()
+      if (!refreshed) {
+        return response
+      }
 
-    return fetch(url, authorizedInit(options))
-  })
+      return fetch(url, authorizedInit(options))
+    })
+  )
 }

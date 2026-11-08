@@ -57,7 +57,7 @@ describe('startApplication', () => {
     await vi.waitFor(() => expect(document.querySelector('#app main')).not.toBeNull())
   })
 
-  it('logs a navigation failure, releases the page load, and still reveals the shell', async () => {
+  it('survives an unreachable API: no navigation failure, page load released, shell revealed on the login page', async () => {
     const navigationError = new Error('network unavailable')
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(navigationError))
@@ -67,7 +67,9 @@ describe('startApplication', () => {
     const { startApplication } = await import('../src/lib/startup')
     await startApplication()
 
-    expect(consoleError).toHaveBeenCalledWith('Initial route navigation failed', navigationError)
+    // The session check failing is handled (user = signed out), so navigation itself succeeds.
+    expect(consoleError).not.toHaveBeenCalledWith('Initial route navigation failed', expect.anything())
+    expect(window.location.pathname).toBe('/login')
     expect(isPageLoading.value).toBe(false)
     expect(isLoading.value).toBe(false)
     expect(isAppReady.value).toBe(true)

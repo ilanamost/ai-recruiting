@@ -96,6 +96,26 @@ describe('lib/auth — useAuth', () => {
     expect(user.value).toBeNull()
   })
 
+  it('fetchMe resolves to null (not a crash) when the server is unreachable, and flags it', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    const { fetchMe, user, serverUnreachable } = useAuth()
+
+    await expect(fetchMe()).resolves.toBeNull()
+    expect(user.value).toBeNull()
+    expect(serverUnreachable.value).toBe(true)
+
+    fetchMock.mockResolvedValue(jsonResponse(recruiter))
+    await fetchMe()
+    expect(serverUnreachable.value).toBe(false)
+  })
+
+  it('login surfaces an unreachable server as an ApiError', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    const { login } = useAuth()
+
+    await expect(login('rita@example.com', 'secret123')).rejects.toMatchObject({ code: 'network_error' })
+  })
+
   it('logout clears the user even if the request fails', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(recruiter))
     const { login, logout, user } = useAuth()

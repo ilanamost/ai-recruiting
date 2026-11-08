@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { UpstreamError } from '../lib/errors'
+import { assertLlmAvailable, isMockMode } from '../lib/llm-mode'
+import { mockAnalyzeResume } from './mock'
 
 /**
  * Structured signal extracted from a resume's already-extracted text, ahead of
@@ -113,6 +115,15 @@ function normalizeYearsExperience(value: unknown): number | null {
  * analysis is never a failed upload (see routes/resume.ts).
  */
 export async function analyzeResume(resumeText: string): Promise<ResumeAnalysis> {
+  assertLlmAvailable()
+  if (isMockMode()) {
+    const mock = mockAnalyzeResume(resumeText)
+    return {
+      years_experience: normalizeYearsExperience(mock.years_experience),
+      skills: normalizeSkills(mock.skills)
+    }
+  }
+
   const model = process.env.ANALYSIS_MODEL ?? 'claude-sonnet-5'
 
   const response = await getClient().messages.create({

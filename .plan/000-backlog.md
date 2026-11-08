@@ -2,11 +2,12 @@
 
 Current queue:
 
-- [V] When I ran the app on a real iphone13 device I got the following issues: 1. I cannot see the app content: I get 'Not authenticated' errors on all routes. 2. The app content is too close to the edges of the device, and part of the navbar is cut as a result. It should be adjusted to mobile devices sizes, there should be padding in the app pages and the navabar. | stack:full | plan:.plan/036-2026-11-07-mobile-iphone-auth-and-layout.md
+- [] When the application loads, on the login and Signup pages, a password appeares in the password field.
+Password filed should be empty untill the user has entered credentials. It shouldn't be filled after refresh and logout either.
 
 - [] on an iphone 13 device - some of the texts appear cut, spread out to several rows instead of remaining on a single row - The attached cvs number and text in the Jobs route (like 3 cvs) for example, check if it happens in other places as well and fix. 
 
-- [] Support a LLM_MODE=mock .env variable, so that analysis and scoring will work without an LLM model as well.
+## DONE
 
 - [V] Add a loader component, The loader will be displayed until each api call finishes running. Add it instead of the already existing loader. | plan:.plan/035-2026-11-01-global-api-loader.md
 
@@ -63,9 +64,6 @@ What should I do next? | plan:.plan/017-2026-08-10-home-page.md
 
 - [V] I signed up as a candidate, and noticed that in the Cvs route I can view the cvs of the other users. I should be able to see only my own Cvs'. | plan:.plan/032-2026-09-10-candidate-cv-list-ownership-scoping.md
 
-## DONE (Examples)
+- [V] When I ran the app on a real iphone13 device I got the following issues: 1. I cannot see the app content: I get 'Not authenticated' errors on all routes. 2. The app content is too close to the edges of the device, and part of the navbar is cut as a result. It should be adjusted to mobile devices sizes, there should be padding in the app pages and the navabar. | stack:full | plan:.plan/036-2026-11-07-mobile-iphone-auth-and-layout.md
 
-
-- [V] conversation top bar (layer name: WhatsApp Chat) | figma:https://www.figma.com/design/tHm72cbGTItMqApwFQ7pkZ/WhatsAppUI?node-id=0-8257&m=dev
-
-- [V] contact info page | figma:https://www.figma.com/design/tHm72cbGTItMqApwFQ7pkZ/WhatsAppUI?node-id=0-9486&m=dev
+- [V] Support a LLM_MODE=mock .env variable, so that analysis and scoring will work without an LLM model as well. | stack:full | plan:.plan/038-2026-11-08-llm-mode-mock.md
