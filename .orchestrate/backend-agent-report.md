@@ -1,35 +1,28 @@
-# Backend Report: LLM_MODE=mock (plan 038)
+# Backend agent report — plan 042 (AI-146)
 
-Branch: `feat/llm-mode-mock` (nothing committed). Status: DONE. Last updated: 2026-11-08.
+Status: DONE (nothing committed)
 
-This report describes the final state. The first version was revised after manual testing; see the
-"Revised" note in `.plan/038-2026-11-08-llm-mode-mock.md`. Test counts are in `.orchestrate/qa-report.md`.
+## Result
+CV upload no longer returns a 500 on a damaged PDF. An unreadable PDF returns 422 and creates no resume.
 
-## Behavior
-- `isMockMode()` is true only for `LLM_MODE=mock`; unset or `live` keeps the real Anthropic path.
-- Invalid value (e.g. `mok`): `reportInvalidLlmMode()` logs an error at startup and the server keeps
-  running. `assertLlmAvailable()` makes `scoreMatch` and `analyzeResume` throw `ServiceUnavailableError`
-  (503, code `service_unavailable`, "Matching is temporarily unavailable..."). CV uploads still succeed
-  (stored unclassified); `/api/health` and the rest of the API are unaffected. It never falls back to live.
-- `scoreMatch` (mock): 35% coverage of technologies the job names + 65% general job vocabulary,
-  mapped through a piecewise-linear curve (0 -> 0, 0.25 -> 20, 0.5 -> 100) to an integer 0-100.
-  Variants are normalized (`Vue.js`/`vue`, `HTML5`/`html`, plurals); known tech names are never stemmed.
-  Explanation starts with `[Mock]` and lists matching and missing skills. A resume with no extractable
-  text scores 0 with an explanation saying so. Calibrated against stored LLM scores; it ignores
-  seniority and required years, so cross-domain pairs can score somewhat high.
-- `analyzeResume` (mock): years from "N years" phrases and dated ranges (overlaps once, `null` when
-  none; a range ending "present" uses the current year); skills from a built-in tech-term list matched
-  on word boundaries; output goes through the existing normalizers.
-- The mock check runs before the Anthropic client is created, so no SDK instance or API key is needed.
+## Tests
+- `cd backend && npm test`: 23 files, 433 tests, all pass.
+- `npm run typecheck`: clean.
+- Not reproduced: the original `bad XRef entry` failure (the reporter's file is not in the repo). The damaged-xref test uses a synthetic PDF and only requires text or a 422.
+- Not checked: which of text or 422 `unpdf` returns for that synthetic file.
+- Not done: before/after comparison of extracted text whitespace (plan risk mitigation).
+- `tsx` and a temporary `tsc` build (deleted) both returned 422 on a bad PDF, so `import('unpdf')` loads under both.
 
-## Changed files
-- backend/src/lib/llm-mode.ts (new), backend/src/lib/errors.ts (`ServiceUnavailableError`)
-- backend/src/scoring/mock.ts (new), backend/src/analysis/mock.ts (new)
-- backend/src/scoring/index.ts, backend/src/analysis/index.ts, backend/src/index.ts
-- backend/tests/llm-mode.test.ts (new), backend/tests/qa-llm-mode.adversarial.test.ts (QA)
-- backend/.env.example (`LLM_MODE=mock`), .env.staging.example and .env.production.example (`LLM_MODE=live`)
-- .doc/backend-overview.md, .doc/deployment.md
+## Changes
+- `pdf-parse` replaced by `unpdf@^2.1.0` in `backend/package.json` and lockfile; `backend/src/types/pdf-parse.d.ts` removed (removal staged via `git rm --cached`).
+- `backend/src/extraction/index.ts`: parser failures become `ValidationError` (422), message "Could not read this PDF. Please re-export it and try again."; logs error name and message only.
+- `backend/src/lib/errors.ts`: `ValidationError` takes an optional `status` (default 400).
+- `backend/src/routes/resume.ts`: unchanged; both `extractText` call sites already use try/catch with `next(error)` and run before any store write.
+- `backend/tests/extraction.test.ts`: 8 tests (valid PDF, damaged xref, empty buffer, non-PDF bytes, no file contents in logs, POST 422 with no new resume, PUT 422 leaving resume unchanged, existing unsupported mime test).
+- `.doc/architecture.md`, `.doc/backend-overview.md`: library name updated.
+- `.orchestrate/api-contract.yaml`: added `POST /api/resume` and `PUT /api/resume/{id}/file` documenting the 422.
 
-## Related frontend change (resilience, same plan)
-- frontend/src/lib/http.ts (`guardNetwork`), lib/auth.ts (`serverUnreachable`), lib/toastMessages.ts,
-  pages/LoginPage.vue, and updated tests. An unreachable API now sends the user to `/login` with a notice.
+## Open
+Plan step 6 (frontend shows the 422 message) is left for the frontend agent.
+
+STATUS: DONE

@@ -46,8 +46,9 @@ export class AppError extends Error {
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string, details?: unknown) {
-    super(ErrorCodes.VALIDATION_ERROR, message, 400, details)
+  /** `status` defaults to 400; use 422 for a well-formed request whose content cannot be processed. */
+  constructor(message: string, details?: unknown, status: number = 400) {
+    super(ErrorCodes.VALIDATION_ERROR, message, status, details)
     this.name = 'ValidationError'
   }
 }

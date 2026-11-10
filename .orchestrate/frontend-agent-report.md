@@ -1,19 +1,19 @@
-# Frontend Agent Report: empty password field (plan 039)
+# Frontend agent report — plan 042 step 6 (AI-145)
 
-Branch: `feat/login-password-field-empty` (nothing committed). Status: DONE. Date: 2026-11-08.
+Status: DONE — check only, no files changed, nothing committed.
 
-Agent-reported results: `npx vitest run` passes (53 files, 881 tests); `npx vue-tsc --noEmit` clean; no lint script. QA must re-verify.
+## Finding
+The backend's 422 message "Could not read this PDF. Please re-export it and try again." is surfaced to the user as a toast on both upload and replace.
 
-## Changes
-- `frontend/src/pages/LoginPage.vue`
-  - Password input has `autocomplete="new-password"` in Login and Signup modes. Email unchanged (plan Q2).
-  - `resetCredentials()` clears the `password` state, resets `showPassword`, and sets the password input's DOM value to `''` via a template ref (autofill writes to the DOM without touching Vue state).
-  - Runs on mount, in `switchMode`, and on `pageshow` when `event.persisted` is true; the listener is removed on unmount.
-- `frontend/tests/LoginPage.test.ts`: mocks extended (`logout`, `user`, `profileImageSrc`, `useRoute`); new `empty password field (.plan/039)` block covering attribute, empty on mount, simulated autofill cleared, mode switch, `pageshow` persisted/not persisted, listener removal, logout-then-login-page path, login/logout/login again, failed login keeps email.
+## Path traced
+- `frontend/src/lib/http.ts`: `parseErrorResponse` reads `body.error.message` and throws `ApiError(code, message)`; the 422 is not swallowed.
+- `frontend/src/stores/resume.ts`: `uploadResume` and `replaceResumeFile` let the rejection propagate to the component.
+- `frontend/src/pages/CvsListPage.vue`: `submitUpload` and `onReplaceFileChange` call `toast.error(err.message)`, falling back to `TOAST.error.resumeUploadFailed` / `resumeFileReplaceFailed` from `frontend/src/lib/toastMessages.ts`. The form stays open and the existing file stays in place.
+- `JobCvsModal.vue` has no upload or replace call.
 
-## Logout
-`NavBar.onLogout` runs `logout()` then `router.push('/login')`; `LoginPage` is remounted, the app never stores the password, and the same attribute plus reset on mount apply. Covered by a dedicated test.
+## Checks
+- `npm test`: 877 passed, 10 failed. All 10 are in `frontend/tests/ui-polish.adversarial.test.ts` (reduced-motion and scrollbar stylesheet assertions). Not verified against a clean tree by the agent; `git status` shows no frontend changes on this branch.
+- `npx vue-tsc --noEmit`: clean.
+- `npm run lint`: not run — `frontend/package.json` has no `lint` script.
 
-## Not verified
-- Real browser with a saved password (first load, refresh, logout): manual check, jsdom cannot prove it.
-- Autofill tests simulate it by overriding the input `value` setter; this is not real autofill.
+STATUS: DONE

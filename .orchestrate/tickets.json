@@ -1,6 +1,6 @@
 {
-  "plan": ".plan/039-2026-11-08-login-password-field-empty.md",
-  "frontend": { "id": "AI-132", "url": "https://linear.app/ai-dev-agents/issue/AI-132/fe-empty-password-field-on-loginsignup-load-refresh-logout" },
-  "backend": null,
-  "qa": { "id": "AI-133", "url": "https://linear.app/ai-dev-agents/issue/AI-133/qa-empty-password-field-on-loginsignup-validation" }
+  "plan": ".plan/042-2026-11-10-cv-upload-xref-error.md",
+  "frontend": { "id": "AI-145", "url": "https://linear.app/ai-dev-agents/issue/AI-145/fe-surface-unreadable-pdf-upload-error-check-only" },
+  "backend": { "id": "AI-146", "url": "https://linear.app/ai-dev-agents/issue/AI-146/be-fix-cv-upload-500-bad-xref-entry" },
+  "qa": { "id": "AI-147", "url": "https://linear.app/ai-dev-agents/issue/AI-147/qa-cv-upload-bad-xref-entry-validation" }
 }

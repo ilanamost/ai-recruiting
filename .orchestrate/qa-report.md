@@ -1,68 +1,43 @@
 === QA REPORT ===
-Ticket: plan 039 - login-password-field-empty
-Date: 2026-11-08
-Branch: feat/login-password-field-empty (uncommitted)
-Scope: frontend-only (frontend/ only; backend/ unaffected, backend checks not applicable)
+Ticket: AI-147 (plan 042, CV upload "bad XRef entry" 500)
+Scope: full stack (backend fix; frontend read-only check)
 
-Static:      vue-tsc --noEmit PASS (exit 0) · lint NOT RUN (frontend has no lint script)
-Unit:        887 passed, 0 failed (54 files, full `npx vitest run`, including QA's 6 adversarial tests
-             in LoginPage.adversarial.test.ts). QA's first full run, before that file was added, was
-             881 passed (53 files). The 887 figure was re-run in full by the orchestrator afterwards.
-E2E:         not applicable - no Playwright/e2e suite exists in frontend/ (no e2e script, no frontend/e2e)
-Backend:     not applicable, frontend-only task
+Static:      backend tsc PASS (clean) · frontend vue-tsc PASS (exit 0) · lint N/A (no lint script in frontend/package.json)
+Unit:        backend 433 passed (23 files) + 25 new adversarial = all pass; frontend 877 passed, 10 failed (pre-existing, see below)
+E2E:         not run (no Playwright in scope for this backend change; frontend e2e unaffected by an unchanged frontend tree)
+Backend:     PASS
 
-Files verified (read independently of the frontend agent report):
-- frontend/src/pages/LoginPage.vue (only source change: +25/-1)
-- frontend/tests/LoginPage.test.ts (new describe 'empty password field (.plan/039)')
-- frontend/tests/LoginPage.adversarial.test.ts (QA-added)
-- SettingsPage.vue is unmodified (git status), and its tests pass.
+Checklist (plan Validation section)
+- backend `npm test` passes incl. new extraction tests — PASS (433/433, then 25/25 in the new file)
+- backend `npm run typecheck` — PASS
+- Corrupt-xref PDF no longer a 500 — PASS. Probe: missing/bad startxref and bad xref entries now extract "Hello" (unpdf recovers); truncated file -> ValidationError 422. 10 damaged variants in the adversarial file all yield text or 422.
+- POST unreadable PDF -> 422 standard shape, no resume persisted — PASS (extraction.test.ts; adversarial: zero bytes, header-only, garbage, NULs all 4xx with error body, resume count unchanged)
+- Normal PDF still uploads and analyses — PASS (multi-page PDF -> 201, years_experience/skills from analysis, all pages' text present; real fixture .orchestrate/fixtures/Ilana_Mostovski_Resume.pdf extracts >100 chars). Analysis throwing on a good PDF -> still 201 (unclassified).
+- Non-PDF mime still rejected — PASS (docx/text/png/octet-stream -> 400, no row; qa-docx-removal suite unchanged and green)
+- frontend `npm test` / lint — PARTIAL: 877 pass, 10 fail (ui-polish.adversarial); lint script does not exist
+- No secrets / docs dir / trailing semicolons — PASS for changed JS/TS (new test file has none); no docs/ created
 
-Acceptance criteria (plan 039 Validation):
-- autocomplete="new-password" in Login and Signup modes - PASS - test 'sets autocomplete="new-password" ... in login and signup modes'
-- Password empty on mount in both modes - PASS - 'has an empty password on mount in both modes'
-- Simulated autofill at mount is cleared - PASS - 'clears a password the browser autofilled into the DOM at mount'. Not vacuous: QA test
-  'autofill simulation is non-vacuous' shows a plain v-model input keeps 'saved-password' with the same hook, so only the
-  resetCredentials() DOM write (passwordInput.value.value = '') can explain the pass.
-- Mode switch clears typed password and resets show/hide to hidden (both directions) - PASS - 'clears a typed password and hides it again...'
-  plus QA 'rapid Login/Signup switching' (10 rapid switches, email kept).
-- pageshow persisted=true clears, persisted=false leaves typed text - PASS - 'clears the password on pageshow with persisted=true but leaves it on persisted=false'
-  (also checks Vue state cleared via the "Password is required" error). QA added 25 repeated persisted=false events: typed text kept.
-- pageshow listener removed on unmount - PASS - 'removes the pageshow listener on unmount' (same handler reference passed to removeEventListener);
-  QA 'pageshow persisted=true after unmount is a no-op' does not throw.
-- Logout path - PASS (with caveat) - 'shows an empty password field on the login page after logging out': NavBar Logout calls logout(),
-  router.push('/login'), then a fresh LoginPage mount with simulated autofill has an empty field. Caveat: the router push is mocked, so the
-  LoginPage is mounted manually by the test rather than by the real router; this is a reasonable but not end-to-end proof.
-- Login, logout, login again does not carry the password - PASS - 'does not carry the previous password ... across login, logout and login again'
-- Failed login keeps email, submit flow intact; existing tests unchanged - PASS - 'keeps the entered email after a failed login' and the
-  pre-existing LoginPage tests all pass unchanged.
-- vitest and vue-tsc pass - PASS - see counts above.
-- Manual real-browser check with a saved password - UNVERIFIED (see below).
+Adversarial coverage (backend/tests/qa-pdf-extraction.adversarial.test.ts, 25 tests, all pass)
+- valid 3-page PDF; no xref + bad startxref; bad startxref; bad xref offsets; truncated 60%; header-only; zero bytes; all-NUL; random binary; header+garbage; junk prefix before valid PDF; 4 MB damaged buffer (no hang)
+- Route: oversize >5 MB -> 4xx, no row; 10 parallel bad uploads -> all 422, no rows; error body has no XRef/pdf.js/stack text; PUT bad file -> not 5xx, resume content unchanged, PUT good file -> 200 with new content; unauthenticated -> 401, no row.
 
-Adversarial cases tried (frontend/tests/LoginPage.adversarial.test.ts, 6 tests, all pass):
-- reset must not wipe characters typed after mount (25 non-persisted pageshow events) - PASS
-- rapid Login/Signup toggling x10 - PASS
-- pageshow after unmount - PASS
-- 12,000-char password with special characters - PASS
-- pageshow persisted=true hides a visible password - PASS
-- validity check of the autofill simulation itself - PASS
+Pre-existing frontend failures
+- All 10 failures are in frontend/tests/ui-polish.adversarial.test.ts (reduced-motion / scrollbar stylesheet assertions, e.g. line 443 regex on CSS now split into SCSS partials `@use './basics'`, consistent with plan 027). `git status --short frontend` and `git diff --stat master -- frontend` are both empty: the frontend tree is identical to the branch base, so these cannot be caused by this change. Not re-run on a separate master worktree (would need a fresh npm install), but identical-tree evidence is conclusive.
 
-Findings:
-- No functional defects found in LoginPage.vue.
-- frontend/src/pages/LoginPage.vue:26-31 - the reset runs in onMounted, not before first paint. A user cannot realistically type within
-  that window, so the plan's typing-at-load risk is low, but it is not tested in a real browser (jsdom is synchronous).
-- frontend/src/pages/LoginPage.vue:46-51 (note, not a defect) - switchMode clears the password but keeps name/email; this matches the plan.
-- Behavior change by design: autocomplete="new-password" means the browser will no longer offer the saved password at login (plan Q1 answer).
-- Code-style: no semicolons in the changed files; consistent with .claude/rules/code-style.md.
+No pdf-parse remnants in code/lockfile
+- backend/package-lock.json: 0 occurrences of pdf-parse; unpdf@2.1.0 resolved with integrity hash; `npm ls` shows only unpdf; `npm ci --dry-run` succeeds. package.json lists unpdf ^2.1.0 only.
+- Stale references (non-functional, FYI): comments in backend/tests/authorization.test.ts:7 and backend/tests/qa-docx-removal.adversarial.test.ts:13 still mention pdf-parse; git-ignored backend/build/extraction/index.js is an old compiled artifact still requiring pdf-parse (rebuild before any deploy from that dir).
 
-UNVERIFIED / NOT COVERED (explicit):
-1. Real-browser behavior with a saved password (Chrome/Edge/Safari/Firefox, password-manager extensions): first load, refresh, bfcache
-   restore, and logout were NOT exercised. jsdom only simulates autofill via a setter hook. Needs a manual check by a human.
-   Browsers may still ignore autocomplete="new-password" in rare cases; the code-level clear is the only mitigation.
-2. Lint: not run, because frontend/package.json has no lint script (only dev, build, preview, test, typecheck).
-3. E2E: no e2e suite exists, so no browser-driven test of the real router/logout flow.
-4. Real bfcache PageTransitionEvent is only simulated with a synthetic Event carrying `persisted`.
-5. Backend: not applicable.
+Findings
+- Low: backend/tests/authorization.test.ts:7 and qa-docx-removal.adversarial.test.ts:13 — comments say pdf-parse; should say unpdf (test files, not feature source).
+- Low: .orchestrate/fixtures/Ilana_Mostovski_Resume.pdf is untracked but NOT git-ignored (plan said fixtures dir is git-ignored); contains a real person's CV. Do not commit; add to .gitignore. My adversarial test reads it only if present.
+- Info: the damaged-xref unit test accepts either text or 422; actual behavior is text recovery for xref damage and 422 only for truncation/garbage/empty.
+- Info: original reporter failure still not reproduced with their file; plan's whitespace before/after comparison not done.
+- Info: log lines "Warning: Indexing all PDF objects" are emitted by pdf.js on recovery; harmless noise.
 
-Result: the feature PASSES all automated checks. Release remains pending the manual real-browser check (item 1).
+Unverified
+- Real (non-mock, live LLM) analysis end-to-end; the reporter's actual PDF; Playwright e2e; frontend toast shown in browser (frontend report traces code path only; I did not independently render it); password-encrypted PDFs.
+
+Overall: feature PASSES. New files by QA: backend/tests/qa-pdf-extraction.adversarial.test.ts. No feature source modified, nothing committed.
 
 STATUS: DONE

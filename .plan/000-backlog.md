@@ -2,11 +2,26 @@
 
 Current queue:
 
-- [V] When the application loads, on the login and Signup pages, a password appeares in the password field.
-Password field should be empty untill the user has entered credentials. It shouldn't be filled after refresh and logout either. | plan:.plan/039-2026-11-08-login-password-field-empty.md
 
+
+(empty)
 
 ## DONE
+
+- [V] When trying to upload a CV in the real, not mock version, I get 500 Internal server error: [5ecd18f5-250b-4c22-9116-0c40f5fb07bb] unexpected error Error
+    at UnknownErrorExceptionClosure (webpack:///src/shared/util.js:400:37)
+    at Object.<anonymous> (webpack:///src/shared/util.js:393:30)
+    at __w_pdfjs_require__ (webpack:///webpack/bootstrap%20c9be985464785b4e5413:19:1)
+    at Object.<anonymous> (webpack:///src/pdf.js:24:23)
+    at __w_pdfjs_require__ (webpack:///webpack/bootstrap%20c9be985464785b4e5413:19:1)
+    at <anonymous> (webpack:///webpack/bootstrap%20c9be985464785b4e5413:62:1)
+    at <anonymous> (webpack:///webpack/bootstrap%20c9be985464785b4e5413:62:1)
+    at webpackUniversalModuleDefinition (webpack:///webpack/universalModuleDefinition:3:1)
+    at Object.<anonymous> (webpack:///webpack/universalModuleDefinition:10:2)
+    at Module._compile (node:internal/modules/cjs/loader:1871:14) {
+  message: 'bad XRef entry',
+  details: 'FormatError: bad XRef entry'
+} | stack:full | plan:.plan/042-2026-11-10-cv-upload-xref-error.md
 
 - [V] Add a loader component, The loader will be displayed until each api call finishes running. Add it instead of the already existing loader. | plan:.plan/035-2026-11-01-global-api-loader.md
 
@@ -68,3 +83,10 @@ What should I do next? | plan:.plan/017-2026-08-10-home-page.md
 - [V] on an iphone 13 device - some of the texts appear cut, spread out to several rows instead of remaining on a single row - The attached cvs number and text in the Jobs route (like 3 cvs) for example, check if it happens in other places as well and fix. 
 
 - [V] Support a LLM_MODE=mock .env variable, so that analysis and scoring will work without an LLM model as well. | stack:full | plan:.plan/038-2026-11-08-llm-mode-mock.md
+
+- [V] When the application loads, on the login and Signup pages, a password appeares in the password field.
+Password field should be empty untill the user has entered credentials. It shouldn't be filled after refresh and logout either. | plan:.plan/039-2026-11-08-login-password-field-empty.md
+
+- [V] When the user is logged out, he shouldn't be able to see buttons that are inactive. He shouldn't be able to see the different application routes in the navbar, except 'AI Recruiting' - that should be visible, but not clickable. He shouldn't be able to see the gear icon with the 'user settings' and 'logout' options. The placeholder and the light/dark switch can remain. The gear icon can either be removed or remain but be unclickable. | plan:.plan/040-2026-11-08-logged-out-navbar.md
+
+- [V] Job matches issue: when I click on a resume in manage cvs, there are 2 match calls, one looks for an existing match, and the other calculates a new one. The behaviour is correct, however if there is no existing match, an error is returned and thrown in a console. I don't think it is even an error, a match wasn't created yet and it is a logical behaviour of the application. Make it a seperate state, not an error, and do not display an error message in the console. | stack:full | plan:.plan/041-2026-11-08-no-existing-match-state.md
