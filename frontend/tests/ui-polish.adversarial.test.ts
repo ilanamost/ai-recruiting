@@ -3,8 +3,8 @@
 // stagger cap far past its cap index, the brand mark actually not navigating, and the
 // prefers-reduced-motion opt-out actually winning the cascade.
 
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { basename, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
@@ -277,10 +277,26 @@ function concatStylesheet(entry: string, seen = new Set<string>()): string {
   seen.add(entry)
 
   const source = readFileSync(entry, 'utf8')
-  return source.replace(/@import\s+['"]([^'"]+)['"]\s*;/g, (whole, specifier: string) => {
+  // `@use` replaced Sass `@import` in the SCSS tree (Dart Sass 3.0 deprecation); `@import` stays
+  // for the plain-CSS entry (main.css). Both inline the target at the rule's position, which for
+  // these side-effect-only partials is the same cascade order.
+  return source.replace(/@(?:import|use)\s+['"]([^'"]+)['"]\s*;/g, (whole, specifier: string) => {
     if (!specifier.startsWith('.')) return ''
-    return concatStylesheet(resolve(dirname(entry), specifier), seen)
+    return concatStylesheet(resolveStylesheet(dirname(entry), specifier), seen)
   })
+}
+
+// Sass resolution: './card' -> card.scss, './setup' -> setup/index.scss (or a _partial). An
+// explicit extension, as in main.css's './styles/setup/tokens.css', is used as written.
+function resolveStylesheet(fromDir: string, specifier: string): string {
+  const base = resolve(fromDir, specifier)
+  const candidates = [
+    base,
+    `${base}.scss`,
+    resolve(dirname(base), `_${basename(base)}.scss`),
+    resolve(base, 'index.scss')
+  ]
+  return candidates.find((candidate) => existsSync(candidate) && statSync(candidate).isFile()) ?? base
 }
 
 // The app loads its CSS as two entries, in this order (see src/main.ts):

@@ -55,6 +55,15 @@
   &.is-active {
     color: var(--primary);
   }
+
+  /* .plan/040: signed-out brand is plain text, not a link — no pointer cursor, no hover shift. */
+  &.is-static {
+    cursor: default;
+
+    &:hover {
+      color: var(--fg);
+    }
+  }
 }
 
 /* .plan/019: same button shape as .theme-toggle, but hidden by default — only the mobile
@@ -99,9 +108,12 @@
   }
 }
 
+/* margin-left: auto keeps the actions right-aligned when .navbar-links is absent (.plan/040),
+   at desktop and phone widths alike. */
 .navbar-actions {
   display: flex;
   flex-shrink: 0;
+  margin-left: auto;
   align-items: center;
   gap: 0.5rem;
 }

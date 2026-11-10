@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
@@ -344,5 +346,156 @@ describe('NavBar', () => {
 
     expect(mockLogout).toHaveBeenCalled()
     expect(router.currentRoute.value.path).toBe('/login')
+  })
+
+  // .plan/040: signed-out navbar — brand (static), theme toggle and avatar placeholder only.
+  describe('signed out (.plan/040)', () => {
+    const adminUser = {
+      id: 'u1',
+      name: 'Ada',
+      email: 'ada@example.com',
+      role: 'admin',
+      org_id: 'demo-org',
+      has_profile_image: false
+    }
+
+    beforeEach(() => {
+      mockUser.value = null
+    })
+
+    async function mountSignedOut() {
+      const router = makeRouter()
+      await router.push('/login')
+      return mount(NavBar, { global: { plugins: [router] } })
+    }
+
+    function readScss() {
+      // vitest runs from frontend/ (jsdom's import.meta.url is not a file: URL).
+      return readFileSync(resolve(process.cwd(), 'src/styles/cmps/navbar.scss'), 'utf-8')
+    }
+
+    it('renders no link and no button other than the theme toggle', async () => {
+      const wrapper = await mountSignedOut()
+
+      expect(wrapper.findAll('a[href]')).toHaveLength(0)
+      const buttons = wrapper.findAll('button')
+      expect(buttons).toHaveLength(1)
+      expect(buttons[0].classes()).toContain('theme-toggle')
+      expect(buttons[0].attributes('aria-label')).toMatch(/Switch to (light|dark) theme/)
+    })
+
+    it('shows the brand icon and name as a static, non-focusable element', async () => {
+      const wrapper = await mountSignedOut()
+
+      const brand = wrapper.find('.navbar-brand')
+      expect(brand.exists()).toBe(true)
+      expect(brand.text()).toBe('AI Recruiting')
+      expect(brand.find('svg').exists()).toBe(true)
+      expect(brand.element.tagName).not.toBe('A')
+      expect(brand.element.closest('a')).toBeNull()
+      expect(brand.attributes('href')).toBeUndefined()
+      expect(brand.attributes('tabindex')).toBeUndefined()
+      expect(brand.classes()).toContain('is-static')
+    })
+
+    it('renders no nav links, hamburger, gear or settings menu items', async () => {
+      const wrapper = await mountSignedOut()
+
+      for (const label of ['New job', 'Jobs', 'CVs', 'User settings', 'Logout']) {
+        expect(wrapper.text()).not.toContain(label)
+      }
+      expect(wrapper.find('.navbar-links').exists()).toBe(false)
+      expect(wrapper.find('.navbar-hamburger').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Settings"]').exists()).toBe(false)
+      expect(wrapper.find('.navbar-menu').exists()).toBe(false)
+      expect(document.body.querySelector('.navbar-mobile-overlay')).toBeNull()
+      expect(document.body.querySelector('.navbar-settings-overlay')).toBeNull()
+    })
+
+    it('keeps the avatar placeholder and a working theme toggle', async () => {
+      const wrapper = await mountSignedOut()
+
+      const avatar = wrapper.find('.avatar')
+      expect(avatar.exists()).toBe(true)
+      expect(avatar.find('img').exists()).toBe(false)
+      expect(avatar.find('svg').exists()).toBe(true)
+
+      const before = wrapper.find('.theme-toggle').attributes('aria-label')
+      await wrapper.find('.theme-toggle').trigger('click')
+      expect(wrapper.find('.theme-toggle').attributes('aria-label')).not.toBe(before)
+    })
+
+    it('shows links, brand link and gear once a user is set, without a remount', async () => {
+      const wrapper = await mountSignedOut()
+      expect(wrapper.find('.navbar-links').exists()).toBe(false)
+
+      mockUser.value = adminUser
+      await flushPromises()
+
+      expect(wrapper.find('.navbar-brand').element.tagName).toBe('A')
+      expect(wrapper.find('.navbar-brand').attributes('href')).toBe('/')
+      expect(wrapper.findAll('.navbar-link').map((link) => link.text())).toEqual(['New job', 'Jobs', 'CVs'])
+      expect(wrapper.find('.navbar-hamburger').exists()).toBe(true)
+      expect(wrapper.find('button[aria-label="Settings"]').exists()).toBe(true)
+    })
+
+    it('hides everything again on logout and does not reopen menus after the next login', async () => {
+      mockUser.value = adminUser
+      const router = makeRouter()
+      await router.push('/')
+      const wrapper = mount(NavBar, { global: { plugins: [router] } })
+      await wrapper.find('.navbar-hamburger').trigger('click')
+      await wrapper.find('button[aria-label="Settings"]').trigger('click')
+
+      mockUser.value = null
+      await flushPromises()
+
+      expect(wrapper.find('.navbar-links').exists()).toBe(false)
+      expect(wrapper.find('.navbar-hamburger').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Settings"]').exists()).toBe(false)
+      expect(wrapper.find('.navbar-menu').exists()).toBe(false)
+      expect(wrapper.find('.navbar-brand').element.tagName).not.toBe('A')
+      expect(document.body.querySelector('.navbar-mobile-overlay')).toBeNull()
+      expect(document.body.querySelector('.navbar-settings-overlay')).toBeNull()
+
+      mockUser.value = adminUser
+      await flushPromises()
+      expect(wrapper.find('.navbar-menu').exists()).toBe(false)
+      expect(wrapper.find('.navbar-links').classes()).not.toContain('is-open')
+    })
+
+    it('ends in the signed-out navbar after a real logout and navigation to /login', async () => {
+      mockUser.value = adminUser
+      mockLogout.mockImplementationOnce(async () => {
+        mockUser.value = null
+      })
+      const router = makeRouter()
+      await router.push('/')
+      const wrapper = mount(NavBar, { global: { plugins: [router] } })
+
+      await wrapper.find('button[aria-label="Settings"]').trigger('click')
+      const logoutItem = wrapper.findAll('button').find((btn) => btn.text().includes('Logout'))
+      await logoutItem?.trigger('click')
+      await flushPromises()
+
+      expect(router.currentRoute.value.path).toBe('/login')
+      expect(wrapper.findAll('a[href]')).toHaveLength(0)
+      expect(wrapper.findAll('button')).toHaveLength(1)
+    })
+
+    // jsdom applies no SCSS, so the static-brand rule and the layout are asserted on the source.
+    it('styles the static brand with no pointer cursor and no hover colour change', () => {
+      const block = readScss().match(/&\.is-static\s*\{([\s\S]*?)\n  \}/)?.[1] ?? ''
+
+      expect(block).toMatch(/cursor:\s*default/)
+      expect(block).toMatch(/&:hover\s*\{[^}]*color:\s*var\(--fg\)/)
+      expect(block).not.toMatch(/pointer/)
+    })
+
+    it('keeps the actions right-aligned when the links container is absent', () => {
+      const actions = readScss().match(/\.navbar-actions\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+
+      expect(actions).toMatch(/margin-left:\s*auto/)
+    })
   })
 })
